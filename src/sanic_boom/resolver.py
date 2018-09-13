@@ -1,0 +1,103 @@
+import inspect
+import typing as t
+from functools import lru_cache
+
+from sanic.request import Request
+
+from sanic_boom.component import Component
+
+
+class Resolver:
+    def __init__(self, app=None):
+        self._app = app
+        self.components = []
+
+    @property
+    def app(self):
+        return self._app
+
+    @app.setter
+    def app(self, value):
+        if self.app is None:
+            self._app = value
+
+    def add_component(self, component: Component):
+        if self.app is None:
+            raise TypeError(
+                "Resolver.app is None. You should provide an application "
+                "instance through the Resolver constructor or the "
+                "Resolver.app property"
+            )
+        if not issubclass(component, Component):
+            raise TypeError(
+                "The 'component' parameter expects a subclass of the "
+                "Component class"
+            )
+
+        self.components.append(component(self.app))
+
+    @lru_cache(maxsize=768)
+    def find_component(self, *, param: inspect.Parameter) -> Component:
+        for component in self.components:
+            resolved = component.resolve(param)
+            if resolved:
+                return component
+        return None
+
+    async def resolve(
+        self,
+        *,
+        request: Request,
+        func: t.Callable,
+        prefetched: t.Dict[str, t.Any] = None,
+        source_param: inspect.Parameter = None
+    ) -> t.Dict[str, t.Any]:
+        if not inspect.isfunction(func) and not inspect.iscoroutinefunction(
+            func
+        ):
+            raise TypeError('The provided parameter "func" is not a function')
+        kwargs = {}
+        params = inspect.signature(func).parameters.values()
+
+        for param in params:
+
+            if prefetched is not None and param.name in prefetched:
+                kwargs.update(
+                    {
+                        param.name: self.app.param_parser(
+                            prefetched.get(param.name), param
+                        )
+                    }
+                )
+                continue
+
+            if isinstance(param.annotation, Request) or param.name in (
+                "request",
+                "req",
+            ):
+                kwargs.update({param.name: request})
+                continue
+
+            if isinstance(
+                param.annotation, inspect.Parameter
+            ) or param.name in ("param", "parameter"):
+                kwargs.update({param.name: source_param or param})
+                continue
+
+            component = self.find_component(param=param)
+
+            if component is None:
+                raise ValueError(
+                    'The requested parameter "{}" could not be resolved to a '
+                    "component".format(param.name)
+                )
+            else:
+                value = await self.app.cache_engine.get(
+                    component, func, request, source_param or param
+                )
+                kwargs.update({param.name: value})
+
+        return kwargs
+
+
+__all__ = ("Resolver",)

@@ -1,0 +1,18 @@
+[paths]
+source =
+  src/sanic_boom
+  */site-packages/sanic_boom
+
+[run]
+branch = true
+source =
+  sanic_boom
+  tests
+parallel = true
+
+[report]
+show_missing = true
+precision = 2
+omit = *benchmarks*
+exclude_lines =
+  noqa
