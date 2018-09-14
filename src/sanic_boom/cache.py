@@ -5,6 +5,7 @@ from threading import local as t_local
 
 from sanic_boom.component import Component
 from sanic_boom.component import ComponentCache
+from sanic_boom.references import DOC_LINKS as dl
 
 _REQUEST_CACHE_KEY = "_sanic_boom_cache"
 
@@ -36,12 +37,7 @@ class CacheEngine:
         elif lifecycle == ComponentCache.CURRENT_THREAD:
             value = await self._resolve_thread(component, request, param)
         elif lifecycle == ComponentCache.APP:
-            warnings.warn(
-                "This method relies on a custom implementation by the user. More "
-                "information about how to implement, why and examples on "
-                "http://CHANGE-HERE.rtfd.io/",
-                RuntimeWarning,
-            )
+            value = await self._resolve_app(component, request, param)
         if value is not None:
             return value
         return await self._resolve_param(component, request, param)
@@ -117,6 +113,17 @@ class CacheEngine:
             self._thread_local.sanic_boom_cache = {}
         self._thread_local.sanic_boom_cache[param] = value
         return value
+
+    async def _resolve_app(
+        self, component: Component, request, param: inspect.Parameter
+    ) -> t.Dict[str, t.Any]:
+        warnings.warn(
+            "This method relies on a custom implementation by the user. More "
+            "information about how to implement, why and examples on "
+            "{}".format(dl.get("CacheEngine._resolve_app")),
+            RuntimeWarning,
+        )
+        return None
 
 
 __all__ = ("CacheEngine",)

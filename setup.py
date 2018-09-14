@@ -22,7 +22,7 @@ setup(
     version="0.1.0",
     license="MIT license",
     description="Component injection and caching, faster routing system and "
-                "non-global middlewares. Give your Sanic application a Boom!",
+    "non-global middlewares. Give your Sanic application a Boom!",
     long_description="%s\n%s"
     % (
         re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub(

@@ -5,34 +5,20 @@ from functools import lru_cache
 from sanic.request import Request
 
 from sanic_boom.component import Component
+from sanic_boom.exceptions import InvalidComponent
+from sanic_boom.exceptions import NoApplicationFound
 
 
 class Resolver:
     def __init__(self, app=None):
-        self._app = app
+        self.app = app
         self.components = []
-
-    @property
-    def app(self):
-        return self._app
-
-    @app.setter
-    def app(self, value):
-        if self.app is None:
-            self._app = value
 
     def add_component(self, component: Component):
         if self.app is None:
-            raise TypeError(
-                "Resolver.app is None. You should provide an application "
-                "instance through the Resolver constructor or the "
-                "Resolver.app property"
-            )
+            raise NoApplicationFound()
         if not issubclass(component, Component):
-            raise TypeError(
-                "The 'component' parameter expects a subclass of the "
-                "Component class"
-            )
+            raise InvalidComponent()
 
         self.components.append(component(self.app))
 

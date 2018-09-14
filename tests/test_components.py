@@ -6,6 +6,8 @@ from sanic.request import Request
 
 from sanic_boom import Component
 from sanic_boom import Resolver
+from sanic_boom.exceptions import InvalidComponent
+from sanic_boom.exceptions import NoApplicationFound
 
 
 class JSONBody(t.Generic[t.T_co]):
@@ -111,7 +113,7 @@ def test_resolver_no_app():
 
     assert resolver.app is None
 
-    with pytest.raises(TypeError):
+    with pytest.raises(NoApplicationFound):
         resolver.add_component(JSONBodyComponent)
 
     resolver.app = sentinel
@@ -119,15 +121,11 @@ def test_resolver_no_app():
 
     assert resolver.app == sentinel
 
-    # setting new app for the resolver won't change the underlying app
-    resolver.app = object()
-    assert resolver.app == sentinel
-
 
 def test_resolver_wrong_component():
     resolver = Resolver(object())
 
-    with pytest.raises(TypeError):
+    with pytest.raises(InvalidComponent):
         resolver.add_component(object)
 
 

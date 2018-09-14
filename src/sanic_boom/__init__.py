@@ -6,6 +6,7 @@ from .cache import CacheEngine
 from .component import Component
 from .component import ComponentCache
 from .resolver import Resolver
+from .router import Router
 from .utils import param_parser
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -16,4 +17,5 @@ __all__ = (
     "ComponentCache",
     "param_parser",
     "Resolver",
+    "Router",
 )
