@@ -89,6 +89,10 @@ class Router:
         return self._get(request.path, request.method)
 
     def _get(self, url, method):
+        # url "normalization", there is no strict slashes for mental sakeness
+        url = url.strip()
+        if url.count("/") > 1:
+            url = url.rstrip("/")  # yes, yes yes and yes! (:
         route, middlewares, params = self._tree.get(url, method)
         if route is None:
             raise NotFound("Requested URL {} not found".format(url))
