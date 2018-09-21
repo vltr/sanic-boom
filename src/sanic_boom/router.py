@@ -52,11 +52,10 @@ class Router:
                 )
                 self._tree.insert(uri, middleware, methods, True)
             else:
+                handler_name = None  # old habits die hard
                 # ----------------------------------------------------------- #
                 # code taken and adapted from the Sanic router
                 # ----------------------------------------------------------- #
-                handler_name = None  # old habits die hard
-
                 if hasattr(handler, "__blueprintname__"):
                     handler_name = "{}.{}".format(
                         handler.__blueprintname__, name or handler.__name__
@@ -89,7 +88,7 @@ class Router:
     def get(self, request):
         return self._get(request.path, request.method)
 
-    def _get(self, url, method, host=None):
+    def _get(self, url, method):
         route, middlewares, params = self._tree.get(url, method)
         if route is None:
             raise NotFound("Requested URL {} not found".format(url))
