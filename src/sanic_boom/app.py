@@ -93,7 +93,7 @@ class SanicBoom(Sanic):
                         "because provided keyword {} is not a string: "
                         "{!s}".format(uri, k, kwargs[k])
                     )
-                uri = uri[: m.start()] + kwargs.pop(k) + uri[m.end():]
+                uri = uri[: m.start()] + kwargs.pop(k) + uri[m.end() :]
 
         if uri.find(":") > -1 or uri.find("*") > -1:
             raise URLBuildError(
