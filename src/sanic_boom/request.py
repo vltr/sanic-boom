@@ -13,8 +13,7 @@ from sanic.request import DEFAULT_HTTP_CONTENT_TYPE
 from sanic.request import RequestParameters
 from sanic.request import json_loads
 from sanic.request import parse_multipart_form
-
-from sanic_boom.utils import get_remote_addr
+from sanic_ipware import get_client_ip
 
 # --------------------------------------------------------------------------- #
 # used headers
@@ -114,7 +113,7 @@ class Request(dict):
             self.body = self._body.getvalue()
             self._body.close()
         else:
-            self.body = b''
+            self.body = b""
 
     # ----------------------------------------------------------------------- #
     # properties
@@ -247,12 +246,27 @@ class Request(dict):
 
     @property
     def remote_addr(self):
-        """Attempt to return the original client ip based on X-Forwarded-For.
-
-        :return: original client ip.
-        """
         if not self.__has("_remote_addr"):
-            self._remote_addr = get_remote_addr(self.headers)
+            proxy_count = None
+            proxy_trusted_ips = None
+            request_header_order = None
+            if self.app and self.app.config:
+                proxy_count = getattr(
+                    self.app.config, "IPWARE_PROXY_COUNT", None
+                )
+                proxy_trusted_ips = getattr(
+                    self.app.config, "IPWARE_PROXY_TRUSTED_IPS", None
+                )
+                request_header_order = getattr(
+                    self.app.config, "IPWARE_REQUEST_HEADER_ORDER", None
+                )
+            ip, _ = get_client_ip(
+                self,
+                proxy_count=proxy_count,
+                proxy_trusted_ips=proxy_trusted_ips,
+                request_header_order=request_header_order,
+            )
+            self._remote_addr = ip
         return self._remote_addr
 
     @property

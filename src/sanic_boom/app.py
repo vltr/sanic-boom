@@ -161,6 +161,13 @@ class SanicBoom(Sanic):
             return register_middleware
 
     def register_middleware(self, middleware, attach_to="request", **kwargs):
+        if "uri" not in kwargs and "methods" not in kwargs:
+            if attach_to == "request":
+                self.request_middleware.append(middleware)
+            if attach_to == "response":
+                self.response_middleware.appendleft(middleware)
+            return middleware
+
         uri = kwargs.pop("uri", "/")
         methods = list(kwargs.pop("methods", HTTP_METHODS))
 
@@ -276,9 +283,31 @@ class SanicBoom(Sanic):
         else:
             write_callback(response)
 
+    async def _run_request_middleware(self, request):
+        if self.request_middleware:
+            for middleware in self.request_middleware:
+                response = middleware(request)
+                if isawaitable(response):
+                    response = await response
+                if response:
+                    return response
+        return None
+
+    async def _run_response_middleware(self, request, response):
+        if self.response_middleware:
+            for middleware in self.response_middleware:
+                _response = middleware(request, response)
+                if isawaitable(_response):
+                    _response = await _response
+                if _response:
+                    response = _response
+                    break
+        return response
+
     # ----------------------------------------------------------------------- #
     # what doesn't make any sense for building APIs
     # ----------------------------------------------------------------------- #
+
     def static(
         self,
         uri,
@@ -306,9 +335,3 @@ class SanicBoom(Sanic):
             ),
             RuntimeWarning,
         )
-
-    async def _run_request_middleware(self, request):
-        pass
-
-    async def _run_response_middleware(self, request, response):
-        pass
