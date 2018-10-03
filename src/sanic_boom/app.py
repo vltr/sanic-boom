@@ -17,9 +17,11 @@ from sanic.response import StreamingHTTPResponse
 
 from sanic_boom.cache import CacheEngine
 from sanic_boom.component import Component
+from sanic_boom.protocol import BoomProtocol
 from sanic_boom.references import DOC_LINKS as dl
+from sanic_boom.request import BoomRequest
 from sanic_boom.resolver import Resolver
-from sanic_boom.router import Router
+from sanic_boom.router import BoomRouter
 from sanic_boom.utils import param_parser
 
 
@@ -27,15 +29,15 @@ class SanicBoom(Sanic):
     def __init__(self, *args, **kwargs):
         if "router" in kwargs:
             kwargs.pop("router")
-        # if "request_class" in kwargs:
-        #     kwargs.pop("request_class")
-        kwargs["router"] = Router()
+        if "request_class" in kwargs:
+            kwargs.pop("request_class")
+        kwargs["router"] = BoomRouter()
+        kwargs["request_class"] = BoomRequest
         components = kwargs.pop("components", [])
         resolver_cls = kwargs.pop("resolver_cls", Resolver)
         cache_engine_cls = kwargs.pop("cache_engine_cls", CacheEngine)
         param_parser_callable = kwargs.pop("param_parser", param_parser)
         super().__init__(*args, **kwargs)
-        # self.components = components
         self.param_parser = param_parser_callable
         self.resolver = resolver_cls(self)
         self.cache_engine = cache_engine_cls(self)
@@ -140,7 +142,7 @@ class SanicBoom(Sanic):
         def response(handler):
             if stream:
                 handler.is_stream = stream
-            self.router.add(uri, methods, handler)
+            self.router.add(uri, methods, handler, version=version, name=name)
             return handler
 
         return response
@@ -303,6 +305,43 @@ class SanicBoom(Sanic):
                     response = _response
                     break
         return response
+
+    # ----------------------------------------------------------------------- #
+    # oof, here we go
+    # ----------------------------------------------------------------------- #
+
+    def _helper(
+        self,
+        host=None,
+        port=None,
+        debug=False,
+        ssl=None,
+        sock=None,
+        workers=1,
+        loop=None,
+        protocol=BoomProtocol,
+        backlog=100,
+        stop_event=None,
+        register_sys_signals=True,
+        run_async=False,
+        auto_reload=False,
+    ):
+
+        return super()._helper(
+            host=host,
+            port=port,
+            debug=debug,
+            ssl=ssl,
+            sock=sock,
+            workers=workers,
+            loop=loop,
+            protocol=protocol,
+            backlog=backlog,
+            stop_event=stop_event,
+            register_sys_signals=register_sys_signals,
+            run_async=run_async,
+            auto_reload=auto_reload,
+        )
 
     # ----------------------------------------------------------------------- #
     # what doesn't make any sense for building APIs

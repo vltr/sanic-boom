@@ -1,17 +1,6 @@
 import asyncio
-import os
 import traceback
 from functools import partial
-from inspect import isawaitable
-from multiprocessing import Process
-from signal import SIG_IGN
-from signal import SIGINT
-from signal import SIGTERM
-from signal import Signals
-from signal import signal as signal_func
-from socket import SO_REUSEADDR
-from socket import SOL_SOCKET
-from socket import socket
 from time import time
 
 from httptools import HttpRequestParser
@@ -26,6 +15,7 @@ from sanic.log import access_logger
 from sanic.log import logger
 from sanic.request import Request
 from sanic.response import HTTPResponse
+from sanic.server import Signal
 
 try:
     import uvloop
@@ -35,14 +25,10 @@ except ImportError:
     pass
 
 
-current_time = None
+_CURRENT_TIME = time()
 
 
-class Signal:
-    stopped = False
-
-
-class HttpProtocol(asyncio.Protocol):
+class BoomProtocol(asyncio.Protocol):
     __slots__ = (
         # event loop, connection
         "loop",
@@ -150,7 +136,7 @@ class HttpProtocol(asyncio.Protocol):
             self.request_timeout, self.request_timeout_callback
         )
         self.transport = transport
-        self._last_request_time = current_time
+        self._last_request_time = _CURRENT_TIME
 
     def connection_lost(self, exc):
         self.connections.discard(self)
@@ -172,7 +158,7 @@ class HttpProtocol(asyncio.Protocol):
         # exactly what this timeout is checking for.
         # Check if elapsed time since request initiated exceeds our
         # configured maximum request timeout value
-        time_elapsed = current_time - self._last_request_time
+        time_elapsed = _CURRENT_TIME - self._last_request_time
         if time_elapsed < self.request_timeout:
             time_left = self.request_timeout - time_elapsed
             self._request_timeout_handler = self.loop.call_later(
@@ -183,15 +169,13 @@ class HttpProtocol(asyncio.Protocol):
                 self._request_stream_task.cancel()
             if self._request_handler_task:
                 self._request_handler_task.cancel()
-            try:
-                raise RequestTimeout("Request Timeout")
-            except RequestTimeout as exception:
-                self.write_error(exception)
+            exception = RequestTimeout("Request timeout")
+            self.write_error(exception)
 
     def response_timeout_callback(self):
         # Check if elapsed time since response was initiated exceeds our
         # configured maximum request timeout value
-        time_elapsed = current_time - self._last_request_time
+        time_elapsed = _CURRENT_TIME - self._last_request_time
         if time_elapsed < self.response_timeout:
             time_left = self.response_timeout - time_elapsed
             self._response_timeout_handler = self.loop.call_later(
@@ -202,35 +186,33 @@ class HttpProtocol(asyncio.Protocol):
                 self._request_stream_task.cancel()
             if self._request_handler_task:
                 self._request_handler_task.cancel()
-            try:
-                raise ServiceUnavailable("Response Timeout")
-            except ServiceUnavailable as exception:
-                self.write_error(exception)
+            exception = ServiceUnavailable("Response timeout")
+            self.write_error(exception)
 
     def keep_alive_timeout_callback(self):
         # Check if elapsed time since last response exceeds our configured
         # maximum keep alive timeout value
-        time_elapsed = current_time - self._last_response_time
+        time_elapsed = _CURRENT_TIME - self._last_response_time
         if time_elapsed < self.keep_alive_timeout:
             time_left = self.keep_alive_timeout - time_elapsed
             self._keep_alive_timeout_handler = self.loop.call_later(
                 time_left, self.keep_alive_timeout_callback
             )
         else:
-            logger.debug("KeepAlive Timeout. Closing connection.")
+            logger.debug("Keep alive timeout. Closing connection")
             self.transport.close()
             self.transport = None
 
-    # -------------------------------------------- #
+    # ----------------------------------------------------------------------- #
     # Parsing
-    # -------------------------------------------- #
+    # ----------------------------------------------------------------------- #
 
     def data_received(self, data):
         # Check for the request itself getting too large and exceeding
         # memory limits
         self._total_request_size += len(data)
         if self._total_request_size > self.request_max_size:
-            exception = PayloadTooLarge("Payload Too Large")
+            exception = PayloadTooLarge("Payload too large")
             self.write_error(exception)
 
         # Create parser if this is the first time we're receiving data
@@ -257,11 +239,16 @@ class HttpProtocol(asyncio.Protocol):
 
     def on_header(self, name, value):
         if name == b"Content-Length" and int(value) > self.request_max_size:
-            exception = PayloadTooLarge("Payload Too Large")
+            exception = PayloadTooLarge("Payload too large")
             self.write_error(exception)
+        try:
+            value = value.decode()
+        except UnicodeDecodeError:
+            value = value.decode("latin_1")
         self.headers.append((name.decode().casefold(), value))
 
     def on_headers_complete(self):
+        # create the request object
         self.request = self.request_class(
             url_bytes=self.url,
             headers=CIMultiDict(self.headers),
@@ -269,6 +256,22 @@ class HttpProtocol(asyncio.Protocol):
             method=self.parser.get_method().decode(),
             transport=self.transport,
         )
+        """
+        # get everything we need to see if this request should proceed or not
+        handler, middlewares, params, uri = self.router.get(self.request)
+        if handler is None:
+            # there is no handler, why should we continue?
+            exception = ServerError("'None' was returned while requesting a "
+                                    "handler from the router")
+            self.write_error(exception)
+            return  # TODO is this needed?
+        self.request["_from_router"] = {
+            "handler": handler,
+            "middlewares": middlewares,
+            "params": params,
+            "uri": uri
+        }
+        """
         # Remove any existing KeepAlive handler here,
         # It will be recreated if required on the new request.
         if self._keep_alive_timeout_handler:
@@ -308,16 +311,16 @@ class HttpProtocol(asyncio.Protocol):
         self._response_timeout_handler = self.loop.call_later(
             self.response_timeout, self.response_timeout_callback
         )
-        self._last_request_time = current_time
+        self._last_request_time = _CURRENT_TIME
         self._request_handler_task = self.loop.create_task(
             self.request_handler(
                 self.request, self.write_response, self.stream_response
             )
         )
 
-    # -------------------------------------------- #
+    # ----------------------------------------------------------------------- #
     # Responding
-    # -------------------------------------------- #
+    # ----------------------------------------------------------------------- #
     def log_response(self, response):
         if self.access_log:
             extra = {"status": getattr(response, "status", 0)}
@@ -384,7 +387,7 @@ class HttpProtocol(asyncio.Protocol):
                 self._keep_alive_timeout_handler = self.loop.call_later(
                     self.keep_alive_timeout, self.keep_alive_timeout_callback
                 )
-                self._last_response_time = current_time
+                self._last_response_time = _CURRENT_TIME
                 self.cleanup()
 
     async def drain(self):
@@ -437,7 +440,7 @@ class HttpProtocol(asyncio.Protocol):
                 self._keep_alive_timeout_handler = self.loop.call_later(
                     self.keep_alive_timeout, self.keep_alive_timeout_callback
                 )
-                self._last_response_time = current_time
+                self._last_response_time = _CURRENT_TIME
                 self.cleanup()
 
     def write_error(self, exception):
@@ -524,264 +527,6 @@ def update_current_time(loop):
     :param loop:
     :return:
     """
-    global current_time
-    current_time = time()
+    global _CURRENT_TIME
+    _CURRENT_TIME = time()
     loop.call_later(1, partial(update_current_time, loop))
-
-
-def trigger_events(events, loop):
-    """Trigger event callbacks (functions or async)
-
-    :param events: one or more sync or async functions to execute
-    :param loop: event loop
-    """
-    for event in events:
-        result = event(loop)
-        if isawaitable(result):
-            loop.run_until_complete(result)
-
-
-def serve(
-    host,
-    port,
-    request_handler,
-    error_handler,
-    before_start=None,
-    after_start=None,
-    before_stop=None,
-    after_stop=None,
-    debug=False,
-    request_timeout=60,
-    response_timeout=60,
-    keep_alive_timeout=5,
-    ssl=None,
-    sock=None,
-    request_max_size=None,
-    reuse_port=False,
-    loop=None,
-    protocol=HttpProtocol,
-    backlog=100,
-    register_sys_signals=True,
-    run_multiple=False,
-    run_async=False,
-    connections=None,
-    signal=Signal(),
-    request_class=None,
-    access_log=True,
-    keep_alive=True,
-    is_request_stream=False,
-    router=None,
-    websocket_max_size=None,
-    websocket_max_queue=None,
-    websocket_read_limit=2 ** 16,
-    websocket_write_limit=2 ** 16,
-    state=None,
-    graceful_shutdown_timeout=15.0,
-):
-    """Start asynchronous HTTP Server on an individual process.
-
-    :param host: Address to host on
-    :param port: Port to host on
-    :param request_handler: Sanic request handler with middleware
-    :param error_handler: Sanic error handler with middleware
-    :param before_start: function to be executed before the server starts
-                         listening. Takes arguments `app` instance and `loop`
-    :param after_start: function to be executed after the server starts
-                        listening. Takes  arguments `app` instance and `loop`
-    :param before_stop: function to be executed when a stop signal is
-                        received before it is respected. Takes arguments
-                        `app` instance and `loop`
-    :param after_stop: function to be executed when a stop signal is
-                       received after it is respected. Takes arguments
-                       `app` instance and `loop`
-    :param debug: enables debug output (slows server)
-    :param request_timeout: time in seconds
-    :param response_timeout: time in seconds
-    :param keep_alive_timeout: time in seconds
-    :param ssl: SSLContext
-    :param sock: Socket for the server to accept connections from
-    :param request_max_size: size in bytes, `None` for no limit
-    :param reuse_port: `True` for multiple workers
-    :param loop: asyncio compatible event loop
-    :param protocol: subclass of asyncio protocol class
-    :param request_class: Request class to use
-    :param access_log: disable/enable access log
-    :param websocket_max_size: enforces the maximum size for
-                               incoming messages in bytes.
-    :param websocket_max_queue: sets the maximum length of the queue
-                                that holds incoming messages.
-    :param websocket_read_limit: sets the high-water limit of the buffer for
-                                 incoming bytes, the low-water limit is half
-                                 the high-water limit.
-    :param websocket_write_limit: sets the high-water limit of the buffer for
-                                  outgoing bytes, the low-water limit is a
-                                  quarter of the high-water limit.
-    :param is_request_stream: disable/enable Request.stream
-    :param router: Router object
-    :return: Nothing
-    """
-    if not run_async:
-        # create new event_loop after fork
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-    if debug:
-        loop.set_debug(debug)
-
-    connections = connections if connections is not None else set()
-    server = partial(
-        protocol,
-        loop=loop,
-        connections=connections,
-        signal=signal,
-        request_handler=request_handler,
-        error_handler=error_handler,
-        request_timeout=request_timeout,
-        response_timeout=response_timeout,
-        keep_alive_timeout=keep_alive_timeout,
-        request_max_size=request_max_size,
-        request_class=request_class,
-        access_log=access_log,
-        keep_alive=keep_alive,
-        is_request_stream=is_request_stream,
-        router=router,
-        websocket_max_size=websocket_max_size,
-        websocket_max_queue=websocket_max_queue,
-        websocket_read_limit=websocket_read_limit,
-        websocket_write_limit=websocket_write_limit,
-        state=state,
-        debug=debug,
-    )
-
-    server_coroutine = loop.create_server(
-        server,
-        host,
-        port,
-        ssl=ssl,
-        reuse_port=reuse_port,
-        sock=sock,
-        backlog=backlog,
-    )
-
-    # Instead of pulling time at the end of every request,
-    # pull it once per minute
-    loop.call_soon(partial(update_current_time, loop))
-
-    if run_async:
-        return server_coroutine
-
-    trigger_events(before_start, loop)
-
-    try:
-        http_server = loop.run_until_complete(server_coroutine)
-    except BaseException:
-        logger.exception("Unable to start server")
-        return
-
-    trigger_events(after_start, loop)
-
-    # Ignore SIGINT when run_multiple
-    if run_multiple:
-        signal_func(SIGINT, SIG_IGN)
-
-    # Register signals for graceful termination
-    if register_sys_signals:
-        _singals = (SIGTERM,) if run_multiple else (SIGINT, SIGTERM)
-        for _signal in _singals:
-            try:
-                loop.add_signal_handler(_signal, loop.stop)
-            except NotImplementedError:
-                logger.warning(
-                    "Sanic tried to use loop.add_signal_handler "
-                    "but it is not implemented on this platform."
-                )
-    pid = os.getpid()
-    try:
-        logger.info("Starting worker [%s]", pid)
-        loop.run_forever()
-    finally:
-        logger.info("Stopping worker [%s]", pid)
-
-        # Run the on_stop function if provided
-        trigger_events(before_stop, loop)
-
-        # Wait for event loop to finish and all connections to drain
-        http_server.close()
-        loop.run_until_complete(http_server.wait_closed())
-
-        # Complete all tasks on the loop
-        signal.stopped = True
-        for connection in connections:
-            connection.close_if_idle()
-
-        # Gracefully shutdown timeout.
-        # We should provide graceful_shutdown_timeout,
-        # instead of letting connection hangs forever.
-        # Let's roughly calcucate time.
-        start_shutdown = 0
-        while connections and (start_shutdown < graceful_shutdown_timeout):
-            loop.run_until_complete(asyncio.sleep(0.1))
-            start_shutdown = start_shutdown + 0.1
-
-        # Force close non-idle connection after waiting for
-        # graceful_shutdown_timeout
-        coros = []
-        for conn in connections:
-            if hasattr(conn, "websocket") and conn.websocket:
-                coros.append(conn.websocket.close_connection())
-            else:
-                conn.close()
-
-        _shutdown = asyncio.gather(*coros, loop=loop)
-        loop.run_until_complete(_shutdown)
-
-        trigger_events(after_stop, loop)
-
-        loop.close()
-
-
-def serve_multiple(server_settings, workers):
-    """Start multiple server processes simultaneously.  Stop on interrupt
-    and terminate signals, and drain connections when complete.
-
-    :param server_settings: kw arguments to be passed to the serve function
-    :param workers: number of workers to launch
-    :param stop_event: if provided, is used as a stop signal
-    :return:
-    """
-    server_settings["reuse_port"] = True
-    server_settings["run_multiple"] = True
-
-    # Handling when custom socket is not provided.
-    if server_settings.get("sock") is None:
-        sock = socket()
-        sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-        sock.bind((server_settings["host"], server_settings["port"]))
-        sock.set_inheritable(True)
-        server_settings["sock"] = sock
-        server_settings["host"] = None
-        server_settings["port"] = None
-
-    def sig_handler(signal, frame):
-        logger.info("Received signal %s. Shutting down.", Signals(signal).name)
-        for process in processes:
-            os.kill(process.pid, SIGTERM)
-
-    signal_func(SIGINT, lambda s, f: sig_handler(s, f))
-    signal_func(SIGTERM, lambda s, f: sig_handler(s, f))
-
-    processes = []
-
-    for _ in range(workers):
-        process = Process(target=serve, kwargs=server_settings)
-        process.daemon = True
-        process.start()
-        processes.append(process)
-
-    for process in processes:
-        process.join()
-
-    # the above processes will block this until they're stopped
-    for process in processes:
-        process.terminate()
-    server_settings.get("sock").close()

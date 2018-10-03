@@ -54,7 +54,12 @@ setup(
         "Topic :: Utilities",
     ],
     keywords=[],
-    install_requires=["Sanic>=0.8.0", "xrtr>=0.1.3", "sanic-ipware>=0.1.0"],
+    install_requires=[
+        "Sanic>=0.8.0",
+        "xrtr>=0.2.0",
+        "sanic-ipware>=0.1.0",
+        "httptools>=0.0.11",
+    ],
     extras_require={
         # eg:
         #   'rst': ['docutils>=0.11'],

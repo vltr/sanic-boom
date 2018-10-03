@@ -1,9 +1,11 @@
 import pytest
 from sanic.request import Request
 
+from sanic_boom import BoomProtocol
 from sanic_boom import CacheEngine
 from sanic_boom import Component
 from sanic_boom import Resolver
+from sanic_boom import SanicBoom
 from sanic_boom import param_parser
 
 
@@ -35,3 +37,13 @@ def sanic_request():
 @pytest.fixture
 def some_app():
     return SomeApp()
+
+
+@pytest.fixture
+def boom_app(request):
+    return SanicBoom(request.node.name)
+
+
+@pytest.fixture
+def server_kw():
+    return {"protocol": BoomProtocol}

@@ -29,7 +29,7 @@ _H_HOST = istr("host")
 # --------------------------------------------------------------------------- #
 
 
-class Request(dict):
+class BoomRequest(dict):
     """Properties of an HTTP request such as URL, headers, etc."""
 
     __slots__ = (
@@ -69,20 +69,6 @@ class Request(dict):
         self.version = version
         self.method = method
         self.transport = transport
-
-        # Init but do not inhale
-        # self._body = BytesIO()
-        # self.body = None
-        # self.parsed_json = None
-        # self.parsed_form = None
-        # self.parsed_files = None
-        # self.parsed_args = None
-        # self.uri_template = None
-        # self._cookies = None
-        # self.stream = None
-        # self._path = None
-        # self._query_string = None
-        # self._scheme = None
 
     def __has(self, key):
         return hasattr(self, key)

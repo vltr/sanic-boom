@@ -1,6 +1,8 @@
+import re
 import warnings
 from typing import NamedTuple
 
+from sanic.exceptions import MethodNotSupported
 from sanic.exceptions import NotFound
 from sanic.router import RouteExists
 from xrtr import RadixTree
@@ -18,7 +20,7 @@ _Middleware = NamedTuple(
 )
 
 
-class Router:
+class BoomRouter:
     def __init__(self):
         self._tree = RadixTree()
         self.routes_names = {}
@@ -37,11 +39,15 @@ class Router:
         is_middleware = kwargs.pop("is_middleware", False)
         # uri "normalization", there is no strict slashes for mental sakeness
         uri = uri.strip()
-        if uri.count("/") > 1:
-            uri = uri.rstrip("/")  # yes, yes yes and yes! (:
+        if uri.count("/") > 1 and uri[-1] == "/":
+            uri = uri[:-1]  # yes, yes yes and yes! (:
+        if version is not None:
+            version = re.escape(str(version).strip("/").lstrip("v"))
+            uri = "/".join(["/v{}".format(version), uri.lstrip("/")])
+        uri = re.sub(r"\/{2,}", "/", uri)
         try:
             if methods:
-                methods = frozenset(methods)
+                methods = list(methods)
             if is_middleware:
                 attach_to = kwargs.pop("attach_to", "request")
                 middleware = _Middleware(
@@ -91,10 +97,16 @@ class Router:
     def _get(self, url, method):
         # url "normalization", there is no strict slashes for mental sakeness
         url = url.strip()
-        if url.count("/") > 1:
-            url = url.rstrip("/")  # yes, yes yes and yes! (:
+        if url.count("/") > 1 and url[-1] == "/":
+            url = url[:-1]  # yes, yes yes and yes! (:
         route, middlewares, params = self._tree.get(url, method)
-        if route is None:
+        if route is self._tree.sentinel:
+            raise MethodNotSupported(
+                "Method {} not allowed for URL {}".format(method, url),
+                method=method,
+                allowed_methods=self.get_supported_methods(url),
+            )
+        elif route is None:
             raise NotFound("Requested URL {} not found".format(url))
         # ------------------------------------------------------------------- #
         # code taken and adapted from the Sanic router
@@ -104,6 +116,9 @@ class Router:
             # W-W-WHY ?!
             route_handler = route_handler.handlers[method]
         return route_handler, middlewares, params, route.uri
+
+    def get_supported_methods(self, url):
+        return self._tree.methods_for(url)
 
     def is_stream_handler(self, request):
         warnings.warn(
@@ -118,4 +133,4 @@ class Router:
         return False
 
 
-__all__ = ("Router",)
+__all__ = ("BoomRouter",)
