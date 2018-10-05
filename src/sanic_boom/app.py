@@ -95,7 +95,7 @@ class SanicBoom(Sanic):
                         "because provided keyword {} is not a string: "
                         "{!s}".format(uri, k, kwargs[k])
                     )
-                uri = uri[: m.start()] + kwargs.pop(k) + uri[m.end() :]
+                uri = uri[: m.start()] + kwargs.pop(k) + uri[m.end():]
 
         if uri.find(":") > -1 or uri.find("*") > -1:
             raise URLBuildError(
@@ -176,43 +176,41 @@ class SanicBoom(Sanic):
         if not uri.startswith("/"):
             uri = "/" + uri
 
-        self.router.add(
-            uri, methods, middleware, is_middleware=True, attach_to=attach_to
+        kwargs.update(
+            {
+                "uri": uri,
+                "methods": methods,
+                "is_middleware": True,
+                "attach_to": attach_to,
+            }
         )
+
+        self.router.add(uri, methods, middleware, **kwargs)
         return middleware
 
     async def handle_request(self, request, write_callback, stream_callback):
-        """Take a request from the HTTP Server and return a response object
-        to be sent back The HTTP Server only expects a response object, so
-        exception handling must be done here
-        :param request: HTTP Request object
-        :param write_callback: Synchronous response function to be
-            called with the response as the only argument
-        :param stream_callback: Coroutine that handles streaming a
-            StreamingHTTPResponse if produced by the handler.
-        :return: Nothing
-        """
         # Define `response` var here to remove warnings about
         # allocation before assignment below.
         response = None
         cancelled = False
         try:
-            # -------------------------------------------- #
-            # Request Middleware
-            # -------------------------------------------- #
-
+            # --------------------------------------------------------------- #
+            # request "global" middlewares
+            # --------------------------------------------------------------- #
             request.app = self
-            response = await self._run_request_middleware(request)
-            # No middleware results
+            if self.request_middleware:
+                response = await self._run_request_middleware(
+                    request, self.request_middleware
+                )
+            # No middleware result
             if not response:
-                # -------------------------------------------- #
-                # Execute Handler
-                # -------------------------------------------- #
-
                 # Fetch handler from router
-                handler, args, kwargs, uri = self.router.get(request)
-
+                handler, middlewares, kwargs, uri = self.router.get(request)
                 request.uri_template = uri
+                # handler = self.request.route_handlers.endpoint
+                # middlewares = self.request.route_handlers.middlewares
+                # kwargs = self.request.route_params
+
                 if handler is None:
                     raise ServerError(
                         (
@@ -220,11 +218,24 @@ class SanicBoom(Sanic):
                             "handler from the router"
                         )
                     )
+                # run layered request middlewares
+                request_middleware = [
+                    m for m in middlewares if m.attach_to == "request"
+                ]
 
-                # Run response handler
-                response = handler(request, *args, **kwargs)
-                if isawaitable(response):
-                    response = await response
+                if request_middleware:
+                    response = await self._run_request_middleware(
+                        request, request_middleware
+                    )
+
+                if not response:
+                    # run response handler
+                    ret = await self.resolver.resolve(
+                        request=request, func=handler, prefetched=kwargs
+                    )
+                    response = handler(**ret)
+                    if isawaitable(response):
+                        response = await response
         except CancelledError:
             # If response handler times out, the server handles the error
             # and cancels the handle_request job.
@@ -264,9 +275,20 @@ class SanicBoom(Sanic):
             # Don't run response middleware if response is None
             if response is not None:
                 try:
-                    response = await self._run_response_middleware(
-                        request, response
-                    )
+                    if self.response_middleware:
+                        response = await self._run_response_middleware(
+                            request, response, self.response_middleware
+                        )
+                    # run layered response middlewares
+                    response_middleware = [
+                        m for m in middlewares if m.attach_to == "response"
+                    ]
+
+                    if response_middleware:
+                        response = await self._run_response_middleware(
+                            request, response, response_middleware
+                        )
+
                 except CancelledError:
                     # Response middleware can timeout too, as above.
                     response = None
@@ -285,25 +307,29 @@ class SanicBoom(Sanic):
         else:
             write_callback(response)
 
-    async def _run_request_middleware(self, request):
-        if self.request_middleware:
-            for middleware in self.request_middleware:
-                response = middleware(request)
-                if isawaitable(response):
-                    response = await response
-                if response:
-                    return response
+    async def _run_request_middleware(self, request, middlewares):
+        for middleware in middlewares:
+            ret = await self.resolver.resolve(request=request, func=middleware)
+            response = middleware(**ret)
+            if isawaitable(response):
+                response = await response
+            if response:
+                return response
         return None
 
-    async def _run_response_middleware(self, request, response):
-        if self.response_middleware:
-            for middleware in self.response_middleware:
-                _response = middleware(request, response)
-                if isawaitable(_response):
-                    _response = await _response
-                if _response:
-                    response = _response
-                    break
+    async def _run_response_middleware(self, request, response, middlewares):
+        for middleware in middlewares:
+            ret = await self.resolver.resolve(
+                request=request,
+                func=middleware,
+                prefetched={"response": response},
+            )
+            _response = middleware(**ret)
+            if isawaitable(_response):
+                _response = await _response
+            if _response:
+                response = _response
+                break
         return response
 
     # ----------------------------------------------------------------------- #

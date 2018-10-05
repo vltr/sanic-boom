@@ -6,6 +6,7 @@ from time import time
 from httptools import HttpRequestParser
 from httptools.parser.errors import HttpParserError
 from multidict import CIMultiDict
+# from sanic.exceptions import SanicException
 from sanic.exceptions import InvalidUsage
 from sanic.exceptions import PayloadTooLarge
 from sanic.exceptions import RequestTimeout
@@ -16,6 +17,8 @@ from sanic.log import logger
 from sanic.request import Request
 from sanic.response import HTTPResponse
 from sanic.server import Signal
+
+# from sanic_boom.wrappers import Handler
 
 try:
     import uvloop
@@ -60,6 +63,7 @@ class BoomProtocol(asyncio.Protocol):
         "_last_response_time",
         "_is_stream_handler",
         "_not_paused",
+        "_error",
     )
 
     def __init__(
@@ -256,22 +260,6 @@ class BoomProtocol(asyncio.Protocol):
             method=self.parser.get_method().decode(),
             transport=self.transport,
         )
-        """
-        # get everything we need to see if this request should proceed or not
-        handler, middlewares, params, uri = self.router.get(self.request)
-        if handler is None:
-            # there is no handler, why should we continue?
-            exception = ServerError("'None' was returned while requesting a "
-                                    "handler from the router")
-            self.write_error(exception)
-            return  # TODO is this needed?
-        self.request["_from_router"] = {
-            "handler": handler,
-            "middlewares": middlewares,
-            "params": params,
-            "uri": uri
-        }
-        """
         # Remove any existing KeepAlive handler here,
         # It will be recreated if required on the new request.
         if self._keep_alive_timeout_handler:
@@ -304,6 +292,19 @@ class BoomProtocol(asyncio.Protocol):
                 self.request.stream.put(None)
             )
             return
+
+        # get everything we need to see if this request should proceed or not
+        # try:
+        #     handler, middlewares, params, uri = self.router.get(self.request)
+        #     self.request.uri_template = uri
+        #     self.request.route_params = params
+        #     self.request.route_handlers = Handler(
+        #         endpoint=handler, middlewares=middlewares
+        #     )
+        # except SanicException as se:
+        #     self.write_error(se)
+        #     return  # whaaaat?
+
         self.request.body_finish()
         self.execute_request_handler()
 

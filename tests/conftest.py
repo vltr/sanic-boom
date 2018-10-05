@@ -40,10 +40,10 @@ def some_app():
 
 
 @pytest.fixture
-def boom_app(request):
+def app(request):
     return SanicBoom(request.node.name)
 
 
 @pytest.fixture
-def server_kw():
-    return {"protocol": BoomProtocol}
+def srv_kw():
+    return {"server_kwargs": {"protocol": BoomProtocol}}

@@ -1,6 +1,5 @@
 import re
 import warnings
-from typing import NamedTuple
 
 from sanic.exceptions import MethodNotSupported
 from sanic.exceptions import NotFound
@@ -8,16 +7,8 @@ from sanic.router import RouteExists
 from xrtr import RadixTree
 
 from sanic_boom.references import DOC_LINKS as dl
-
-_Route = NamedTuple(
-    "_Route",
-    [("name", str), ("handler", object), ("methods", set), ("uri", str)],
-)
-
-_Middleware = NamedTuple(
-    "_Middleware",
-    [("handler", object), ("methods", set), ("uri", str), ("attach_to", str)],
-)
+from sanic_boom.wrappers import Middleware
+from sanic_boom.wrappers import Route
 
 
 class BoomRouter:
@@ -39,18 +30,22 @@ class BoomRouter:
         is_middleware = kwargs.pop("is_middleware", False)
         # uri "normalization", there is no strict slashes for mental sakeness
         uri = uri.strip()
+
         if uri.count("/") > 1 and uri[-1] == "/":
             uri = uri[:-1]  # yes, yes yes and yes! (:
+
         if version is not None:
             version = re.escape(str(version).strip("/").lstrip("v"))
             uri = "/".join(["/v{}".format(version), uri.lstrip("/")])
         uri = re.sub(r"\/{2,}", "/", uri)
+
         try:
             if methods:
                 methods = list(methods)
+
             if is_middleware:
                 attach_to = kwargs.pop("attach_to", "request")
-                middleware = _Middleware(
+                middleware = Middleware(
                     handler=handler,
                     methods=methods,
                     uri=uri,
@@ -69,7 +64,7 @@ class BoomRouter:
                 else:
                     handler_name = name or getattr(handler, "__name__", None)
 
-                route = _Route(
+                route = Route(
                     handler=handler,
                     methods=methods,
                     uri=uri,
@@ -79,8 +74,8 @@ class BoomRouter:
 
                 if self.routes_names.get(handler_name) is None:
                     self.routes_names[handler_name] = (uri, route)
-        except ValueError as ve:
-            raise RouteExists from ve
+        except KeyError as ke:
+            raise RouteExists from ke
 
     def find_route_by_view_name(self, view_name):
         # ------------------------------------------------------------------- #
@@ -97,9 +92,11 @@ class BoomRouter:
     def _get(self, url, method):
         # url "normalization", there is no strict slashes for mental sakeness
         url = url.strip()
+
         if url.count("/") > 1 and url[-1] == "/":
             url = url[:-1]  # yes, yes yes and yes! (:
         route, middlewares, params = self._tree.get(url, method)
+
         if route is self._tree.sentinel:
             raise MethodNotSupported(
                 "Method {} not allowed for URL {}".format(method, url),
@@ -112,6 +109,7 @@ class BoomRouter:
         # code taken and adapted from the Sanic router
         # ------------------------------------------------------------------- #
         route_handler = route.handler
+
         if hasattr(route_handler, "handlers"):
             # W-W-WHY ?!
             route_handler = route_handler.handlers[method]

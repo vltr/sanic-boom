@@ -42,6 +42,8 @@ class BoomRequest(dict):
         "_port",
         "_query_string",
         "_remote_addr",
+        "_route_handlers",
+        "_route_params",
         "_socket",
         "_scheme",
         "_app",
@@ -69,6 +71,7 @@ class BoomRequest(dict):
         self.version = version
         self.method = method
         self.transport = transport
+        self.stream = None
 
     def __has(self, key):
         return hasattr(self, key)
@@ -117,19 +120,33 @@ class BoomRequest(dict):
             self._app = value
 
     @property
+    def route_params(self):
+        if self.__has("_route_params"):
+            return self._route_params
+        return None
+
+    @route_params.setter
+    def route_params(self, value):
+        if self.route_params is None:
+            self._route_params = value
+
+    @property
+    def route_handlers(self):
+        if self.__has("_route_handlers"):
+            return self._route_handlers
+        return None
+
+    @route_handlers.setter
+    def route_handlers(self, value):
+        if self.route_handlers is None:
+            self._route_handlers = value
+
+    @property
     def json(self):
         if not self.__has("parsed_json"):
             self._load_json()
 
         return self.parsed_json
-
-    def _load_json(self, loads=json_loads):
-        try:
-            self.parsed_json = loads(self.body)
-        except Exception:
-            if not self.body:
-                return
-            raise InvalidUsage("Failed parsing the body as json")
 
     @property
     def form(self):
@@ -210,6 +227,14 @@ class BoomRequest(dict):
             self._get_address()
         return self._socket
 
+    def _load_json(self, loads=json_loads):
+        try:
+            self.parsed_json = loads(self.body)
+        except Exception:
+            if not self.body:
+                return
+            raise InvalidUsage("Failed parsing the body as json")
+
     def _get_address(self):
         sock = self.transport.get_extra_info("socket")
 
@@ -259,7 +284,7 @@ class BoomRequest(dict):
     def scheme(self):
         if not self.__has("_scheme"):
             if (
-                self.app.websocket_enabled
+                self.app and self.app.websocket_enabled
                 and self.headers.get(_H_UPGRADE) == "websocket"
             ):
                 self._scheme = "ws"
