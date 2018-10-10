@@ -1,12 +1,12 @@
 import inspect
 import typing as t
+
 from functools import lru_cache
 
 from sanic.request import Request
 
 from sanic_boom.component import Component
-from sanic_boom.exceptions import InvalidComponent
-from sanic_boom.exceptions import NoApplicationFound
+from sanic_boom.exceptions import InvalidComponent, NoApplicationFound
 
 
 class Resolver:

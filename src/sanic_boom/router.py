@@ -1,14 +1,14 @@
 import re
 import warnings
+from collections.abc import Iterable
+from functools import lru_cache
 
-from sanic.exceptions import MethodNotSupported
-from sanic.exceptions import NotFound
-from sanic.router import RouteExists
-from xrtr import RadixTree
+from sanic.exceptions import MethodNotSupported, NotFound
+from sanic.router import ROUTER_CACHE_SIZE, RouteExists
 
 from sanic_boom.references import DOC_LINKS as dl
-from sanic_boom.wrappers import Middleware
-from sanic_boom.wrappers import Route
+from sanic_boom.wrappers import Middleware, MiddlewareType, Route
+from xrtr import RadixTree
 
 
 class BoomRouter:
@@ -25,9 +25,10 @@ class BoomRouter:
         strict_slashes=False,
         version=None,
         name=None,
-        **kwargs
+        is_middleware=False,
+        attach_to=MiddlewareType.REQUEST,
+        **kwargs  # ! is this necessary yet?
     ):
-        is_middleware = kwargs.pop("is_middleware", False)
         # uri "normalization", there is no strict slashes for mental sakeness
         uri = uri.strip()
 
@@ -40,18 +41,20 @@ class BoomRouter:
         uri = re.sub(r"\/{2,}", "/", uri)
 
         try:
-            if methods:
+            if not isinstance(methods, Iterable):
+                raise ValueError(
+                    "Expected Iterable for methods, got {!r}".format(host)
+                )
+
+            if isinstance(methods, str):
+                methods = [methods]
+            elif not isinstance(methods, list):
                 methods = list(methods)
 
             if is_middleware:
-                attach_to = kwargs.pop("attach_to", "request")
-                middleware = Middleware(
-                    handler=handler,
-                    methods=methods,
-                    uri=uri,
-                    attach_to=attach_to,
-                )
-                self._tree.insert(uri, middleware, methods, True)
+                middleware = Middleware(handler=handler, attach_to=attach_to)
+                self._tree.insert(uri, middleware, methods, no_conflict=True)
+
             else:
                 handler_name = None  # old habits die hard
                 # ----------------------------------------------------------- #
@@ -64,16 +67,23 @@ class BoomRouter:
                 else:
                     handler_name = name or getattr(handler, "__name__", None)
 
+                if self.routes_names.get(handler_name) is not None:
+                    msg = (
+                        "The given route with handler_name='{}' is already "
+                        "registered or clashes with "
+                        "another".format(handler_name)
+                    )
+                    raise RouteExists(msg)
+
                 route = Route(
                     handler=handler,
                     methods=methods,
                     uri=uri,
                     name=handler_name,
                 )
-                self._tree.insert(uri, route, methods)
+                self._tree.insert(path=uri, handler=route, methods=methods)
+                self.routes_names[handler_name] = (uri, route)
 
-                if self.routes_names.get(handler_name) is None:
-                    self.routes_names[handler_name] = (uri, route)
         except KeyError as ke:
             raise RouteExists from ke
 
@@ -89,6 +99,7 @@ class BoomRouter:
     def get(self, request):
         return self._get(request.path, request.method)
 
+    @lru_cache(maxsize=ROUTER_CACHE_SIZE)
     def _get(self, url, method):
         # url "normalization", there is no strict slashes for mental sakeness
         url = url.strip()
@@ -110,8 +121,8 @@ class BoomRouter:
         # ------------------------------------------------------------------- #
         route_handler = route.handler
 
-        if hasattr(route_handler, "handlers"):
-            # W-W-WHY ?!
+        if hasattr(route_handler, "handlers"):  # noqa
+            # W-W-WHY ?! I don't even know what this is or why is it here
             route_handler = route_handler.handlers[method]
         return route_handler, middlewares, params, route.uri
 

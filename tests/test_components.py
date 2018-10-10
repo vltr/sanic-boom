@@ -2,12 +2,11 @@ import inspect
 import typing as t
 
 import pytest
+
 from sanic.request import Request
 
-from sanic_boom import Component
-from sanic_boom import Resolver
-from sanic_boom.exceptions import InvalidComponent
-from sanic_boom.exceptions import NoApplicationFound
+from sanic_boom import Component, Resolver
+from sanic_boom.exceptions import InvalidComponent, NoApplicationFound
 
 
 class JSONBody(t.Generic[t.T_co]):

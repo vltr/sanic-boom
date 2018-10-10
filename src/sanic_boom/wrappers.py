@@ -1,7 +1,9 @@
-# class Handler:
-#     def __init__(self, endpoint: object, middlewares: list):
-#         self.endpoint = endpoint
-#         self.middlewares = middlewares
+from enum import IntEnum
+
+
+class MiddlewareType(IntEnum):
+    REQUEST = 1
+    RESPONSE = 2
 
 
 class Route:
@@ -11,12 +13,16 @@ class Route:
         self.methods = methods
         self.uri = uri
 
+    def __repr__(self):
+        return "<Route name: {}, methods: {}, uri: {}>".format(
+            self.name, self.methods, self.uri
+        )
+
 
 class Middleware:
-    def __init__(
-        self, handler: object, methods: set, uri: str, attach_to: str
-    ):
+    def __init__(self, handler: object, attach_to: MiddlewareType):
         self.handler = handler
-        self.methods = methods
-        self.uri = uri
         self.attach_to = attach_to
+
+    def __repr__(self):
+        return "<Middleware for: {}>".format(str(self.attach_to))

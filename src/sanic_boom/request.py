@@ -1,19 +1,20 @@
-import socket
 from cgi import parse_header
 from http.cookies import SimpleCookie
 from io import BytesIO
-from urllib.parse import parse_qs
-from urllib.parse import urlunparse
+from urllib.parse import parse_qs, urlunparse
 
 from httptools import parse_url
 from multidict import istr
 from sanic.exceptions import InvalidUsage
 from sanic.log import error_logger
-from sanic.request import DEFAULT_HTTP_CONTENT_TYPE
-from sanic.request import RequestParameters
-from sanic.request import json_loads
-from sanic.request import parse_multipart_form
+from sanic.request import (
+    DEFAULT_HTTP_CONTENT_TYPE,
+    RequestParameters,
+    json_loads,
+    parse_multipart_form,
+)
 from sanic_ipware import get_client_ip
+
 
 # --------------------------------------------------------------------------- #
 # used headers
@@ -42,8 +43,8 @@ class BoomRequest(dict):
         "_port",
         "_query_string",
         "_remote_addr",
-        "_route_handlers",
-        "_route_params",
+        # "_route_handlers",
+        # "_route_params",
         "_socket",
         "_scheme",
         "_app",
@@ -119,27 +120,27 @@ class BoomRequest(dict):
         if self.app is None:
             self._app = value
 
-    @property
-    def route_params(self):
-        if self.__has("_route_params"):
-            return self._route_params
-        return None
+    # @property
+    # def route_params(self):
+    #     if self.__has("_route_params"):
+    #         return self._route_params
+    #     return None
 
-    @route_params.setter
-    def route_params(self, value):
-        if self.route_params is None:
-            self._route_params = value
+    # @route_params.setter
+    # def route_params(self, value):
+    #     if self.route_params is None:
+    #         self._route_params = value
 
-    @property
-    def route_handlers(self):
-        if self.__has("_route_handlers"):
-            return self._route_handlers
-        return None
+    # @property
+    # def route_handlers(self):
+    #     if self.__has("_route_handlers"):
+    #         return self._route_handlers
+    #     return None
 
-    @route_handlers.setter
-    def route_handlers(self, value):
-        if self.route_handlers is None:
-            self._route_handlers = value
+    # @route_handlers.setter
+    # def route_handlers(self, value):
+    #     if self.route_handlers is None:
+    #         self._route_handlers = value
 
     @property
     def json(self):
@@ -236,24 +237,11 @@ class BoomRequest(dict):
             raise InvalidUsage("Failed parsing the body as json")
 
     def _get_address(self):
-        sock = self.transport.get_extra_info("socket")
-
-        if sock.family == socket.AF_INET:
-            self._socket = self.transport.get_extra_info("peername") or (
-                None,
-                None,
-            )
-            self._ip, self._port = self._socket
-        elif sock.family == socket.AF_INET6:
-            self._socket = self.transport.get_extra_info("peername") or (
-                None,
-                None,
-                None,
-                None,
-            )
-            self._ip, self._port, *_ = self._socket
-        else:
-            self._ip, self._port = (None, None)
+        self._socket = self.transport.get_extra_info("peername") or (
+            None,
+            None,
+        )
+        self._ip, self._port = self._socket[0], self._socket[1]
 
     @property
     def remote_addr(self):
@@ -284,7 +272,8 @@ class BoomRequest(dict):
     def scheme(self):
         if not self.__has("_scheme"):
             if (
-                self.app and self.app.websocket_enabled
+                self.app
+                and self.app.websocket_enabled
                 and self.headers.get(_H_UPGRADE) == "websocket"
             ):
                 self._scheme = "ws"

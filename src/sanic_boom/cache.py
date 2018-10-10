@@ -1,11 +1,12 @@
 import inspect
 import typing as t
 import warnings
+
 from threading import local as t_local
 
-from sanic_boom.component import Component
-from sanic_boom.component import ComponentCache
+from sanic_boom.component import Component, ComponentCache
 from sanic_boom.references import DOC_LINKS as dl
+
 
 _REQUEST_CACHE_KEY = "_sanic_boom_cache"
 

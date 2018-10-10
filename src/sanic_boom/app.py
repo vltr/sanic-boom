@@ -3,17 +3,13 @@ import warnings
 from asyncio import CancelledError
 from inspect import isawaitable
 from traceback import format_exc
-from urllib.parse import urlencode
-from urllib.parse import urlunparse
+from urllib.parse import urlencode, urlunparse
 
 from sanic import Sanic
 from sanic.constants import HTTP_METHODS
-from sanic.exceptions import SanicException
-from sanic.exceptions import ServerError
-from sanic.exceptions import URLBuildError
+from sanic.exceptions import SanicException, ServerError, URLBuildError
 from sanic.log import error_logger
-from sanic.response import HTTPResponse
-from sanic.response import StreamingHTTPResponse
+from sanic.response import HTTPResponse, StreamingHTTPResponse
 
 from sanic_boom.cache import CacheEngine
 from sanic_boom.component import Component
@@ -23,6 +19,7 @@ from sanic_boom.request import BoomRequest
 from sanic_boom.resolver import Resolver
 from sanic_boom.router import BoomRouter
 from sanic_boom.utils import param_parser
+from sanic_boom.wrappers import MiddlewareType
 
 
 class SanicBoom(Sanic):
@@ -82,9 +79,15 @@ class SanicBoom(Sanic):
             if "://" in _server[:8]:
                 _server = _server.split("://", 1)[-1]
 
+        replaced_vars = []
+
         for k, v in kwargs.items():
             if uri.find(k) > -1:
-                uri = uri.replace(":{}".format(k), v)
+                replaced_vars.append(k)
+                uri = uri.replace(":{}".format(k), str(v))
+
+        for k in replaced_vars:
+            del kwargs[k]
 
         for k in kwargs:
             m = re.search(r"([:|\*]{})".format(k), uri)
@@ -181,11 +184,12 @@ class SanicBoom(Sanic):
                 "uri": uri,
                 "methods": methods,
                 "is_middleware": True,
-                "attach_to": attach_to,
+                "attach_to": MiddlewareType[attach_to.upper()],
+                "handler": middleware,
             }
         )
 
-        self.router.add(uri, methods, middleware, **kwargs)
+        self.router.add(**kwargs)
         return middleware
 
     async def handle_request(self, request, write_callback, stream_callback):
@@ -193,6 +197,7 @@ class SanicBoom(Sanic):
         # allocation before assignment below.
         response = None
         cancelled = False
+        middlewares = []
         try:
             # --------------------------------------------------------------- #
             # request "global" middlewares
@@ -220,7 +225,9 @@ class SanicBoom(Sanic):
                     )
                 # run layered request middlewares
                 request_middleware = [
-                    m for m in middlewares if m.attach_to == "request"
+                    m.handler
+                    for m in middlewares
+                    if m.attach_to == MiddlewareType.REQUEST
                 ]
 
                 if request_middleware:
@@ -269,9 +276,9 @@ class SanicBoom(Sanic):
                         "An error occurred while handling an error", status=500
                     )
         finally:
-            # -------------------------------------------- #
+            # --------------------------------------------------------------- #
             # Response Middleware
-            # -------------------------------------------- #
+            # --------------------------------------------------------------- #
             # Don't run response middleware if response is None
             if response is not None:
                 try:
@@ -281,7 +288,9 @@ class SanicBoom(Sanic):
                         )
                     # run layered response middlewares
                     response_middleware = [
-                        m for m in middlewares if m.attach_to == "response"
+                        m.handler
+                        for m in middlewares
+                        if m.attach_to == MiddlewareType.RESPONSE
                     ]
 
                     if response_middleware:
@@ -336,7 +345,7 @@ class SanicBoom(Sanic):
     # oof, here we go
     # ----------------------------------------------------------------------- #
 
-    def _helper(
+    def run(
         self,
         host=None,
         port=None,
@@ -344,29 +353,26 @@ class SanicBoom(Sanic):
         ssl=None,
         sock=None,
         workers=1,
-        loop=None,
         protocol=BoomProtocol,
         backlog=100,
         stop_event=None,
         register_sys_signals=True,
-        run_async=False,
-        auto_reload=False,
+        access_log=True,
+        **kwargs
     ):
-
-        return super()._helper(
+        super().run(
             host=host,
             port=port,
             debug=debug,
             ssl=ssl,
             sock=sock,
             workers=workers,
-            loop=loop,
             protocol=protocol,
             backlog=backlog,
             stop_event=stop_event,
             register_sys_signals=register_sys_signals,
-            run_async=run_async,
-            auto_reload=auto_reload,
+            access_log=access_log,
+            **kwargs
         )
 
     # ----------------------------------------------------------------------- #

@@ -1,5 +1,7 @@
 import pytest
+from sanic.blueprints import Blueprint
 from sanic.constants import HTTP_METHODS
+from sanic.exceptions import URLBuildError
 from sanic.response import text
 from sanic.router import RouteExists
 
@@ -201,17 +203,133 @@ def test_is_stream_handler_warning(app, srv_kw):
     assert response.status == 200
 
 
-def test_layered_middleware(app, srv_kw):  # 52-59
-    pass
+def test_layered_middleware(app, srv_kw):  # 47-48
+    @app.middleware(uri="/hello")
+    def middleware_handler(request):
+        request["hello"] = 1
+
+    @app.get("/hello/world")
+    def hello_world_handler(request):
+        request["hello"] += 1
+        return text("OK")
+
+    @app.route("/foo", methods={"GET"})
+    def foo_handler(request):
+        return text("BAR")
+
+    request, response = app.test_client.get("/hello", **srv_kw)
+    assert response.status == 404
+
+    request, response = app.test_client.get("/hello/world", **srv_kw)
+    assert response.status == 200
+    assert response.text == "OK"
+    assert request["hello"] == 2
+
+    request, response = app.test_client.get("/foo", **srv_kw)
+    assert response.status == 200
+    assert response.text == "BAR"
+    assert "hello" not in request
 
 
-def test_blueprint(app, srv_kw):  # 66
-    pass
+def test_blueprint(app, srv_kw):
+    bp = Blueprint("test_text", url_prefix="/test")
+
+    @bp.get("/get")
+    def handler(request):
+        return text("OK")
+
+    app.blueprint(bp)
+
+    request, response = app.test_client.get("/test/get/", **srv_kw)
+    assert response.status == 200
+
+    request, response = app.test_client.get("/test/get", **srv_kw)
+    assert response.status == 200
 
 
-def test_find_route_by_view_name(app, srv_kw):  # 89-92
-    pass
+def test_find_route_by_view_name(app, srv_kw):
+    bp = Blueprint("test_text", url_prefix="/test")
+
+    @bp.get("/get")
+    def handler(request):
+        return text("OK")  # noqa
+
+    app.blueprint(bp)
+
+    assert app.url_for("test_text.handler") == "/test/get"
+
+    with pytest.raises(URLBuildError):
+        app.url_for("foobarbaz")
+
+    with pytest.raises(URLBuildError):
+        app.url_for(None)
 
 
-def test_route_handler_dot_handler(app, srv_kw):  # 117
-    pass
+def test_error_on_same_variable_names(app, srv_kw):
+    with pytest.raises(ValueError):
+        @app.get("/hello/:variable/:variable")
+        def handler(request):  # noqa
+            pass
+
+    with pytest.raises(ValueError):
+        @app.get("/hello/:variable/*variable")
+        def another_handler(request):  # noqa
+            pass
+
+
+def test_variable_name_substitution(app, srv_kw):
+    @app.get("/get/:command/:id")
+    def handler(request):  # noqa
+        pass
+
+    assert app.url_for("handler", command="error", id=20) == "/get/error/20"
+
+
+def test_possible_values_on_methods(app, srv_kw):
+    @app.route("/", methods=None)
+    def handler(request):
+        return text("OK")  # noqa
+
+    assert app.router.get_supported_methods("/") == {"GET"}
+
+    @app.route("/hello", methods="GET")
+    def hello_handler(request):
+        return text("OK")  # noqa
+
+    assert app.url_for("hello_handler") == "/hello"
+    assert app.router.get_supported_methods("/hello") == {"GET"}
+
+    @app.route("/world", methods=("GET", "POST"))
+    def world_handler(request):
+        return text("OK")  # noqa
+
+    assert app.router.get_supported_methods("/world") == {"GET", "POST"}
+
+    with pytest.raises(ValueError):
+        @app.route("/foo", methods=range)
+        def range_handler(request):
+            return text("OK")  # noqa
+
+
+def test_duplicate_name_for_handlers(app, srv_kw):
+    @app.get("/", name="foo")
+    def foo_root_handler(request):
+        return text("OK")  # noqa
+
+    with pytest.raises(RouteExists):
+        @app.get("/foo", name="foo")
+        def foo_handler(request):
+            return text("OK")  # noqa
+
+
+def test_basic_component_handling(app, srv_kw):
+    @app.get("/test/:command/:identifier")
+    def handler(command: str, identifier: int):
+        assert isinstance(command, str)
+        assert command == "error"
+        assert isinstance(identifier, int)
+        assert identifier == 42
+        return text("OK")
+
+    request, response = app.test_client.get("/test/error/42", **srv_kw)
+    assert response.status == 200

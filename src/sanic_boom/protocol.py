@@ -1,24 +1,29 @@
 import asyncio
 import traceback
+
 from functools import partial
 from time import time
 
 from httptools import HttpRequestParser
 from httptools.parser.errors import HttpParserError
 from multidict import CIMultiDict
-# from sanic.exceptions import SanicException
-from sanic.exceptions import InvalidUsage
-from sanic.exceptions import PayloadTooLarge
-from sanic.exceptions import RequestTimeout
-from sanic.exceptions import ServerError
-from sanic.exceptions import ServiceUnavailable
-from sanic.log import access_logger
-from sanic.log import logger
+from sanic.log import access_logger, logger
 from sanic.request import Request
 from sanic.response import HTTPResponse
 from sanic.server import Signal
 
+
+from sanic.exceptions import (  # MethodNotSupported,; NotFound,
+    InvalidUsage,
+    PayloadTooLarge,
+    RequestTimeout,
+    ServerError,
+    ServiceUnavailable,
+)
+
+
 # from sanic_boom.wrappers import Handler
+
 
 try:
     import uvloop
@@ -173,8 +178,7 @@ class BoomProtocol(asyncio.Protocol):
                 self._request_stream_task.cancel()
             if self._request_handler_task:
                 self._request_handler_task.cancel()
-            exception = RequestTimeout("Request timeout")
-            self.write_error(exception)
+            self.write_error(RequestTimeout("Request timeout"))
 
     def response_timeout_callback(self):
         # Check if elapsed time since response was initiated exceeds our
@@ -190,8 +194,7 @@ class BoomProtocol(asyncio.Protocol):
                 self._request_stream_task.cancel()
             if self._request_handler_task:
                 self._request_handler_task.cancel()
-            exception = ServiceUnavailable("Response timeout")
-            self.write_error(exception)
+            self.write_error(ServiceUnavailable("Response timeout"))
 
     def keep_alive_timeout_callback(self):
         # Check if elapsed time since last response exceeds our configured
@@ -216,8 +219,7 @@ class BoomProtocol(asyncio.Protocol):
         # memory limits
         self._total_request_size += len(data)
         if self._total_request_size > self.request_max_size:
-            exception = PayloadTooLarge("Payload too large")
-            self.write_error(exception)
+            self.write_error(PayloadTooLarge("Payload too large"))
 
         # Create parser if this is the first time we're receiving data
         if self.parser is None:
@@ -235,16 +237,14 @@ class BoomProtocol(asyncio.Protocol):
             message = "Bad Request"
             if self._debug:
                 message += "\n" + traceback.format_exc()
-            exception = InvalidUsage(message)
-            self.write_error(exception)
+            self.write_error(InvalidUsage(message))
 
     def on_url(self, url):
         self.url = url
 
     def on_header(self, name, value):
         if name == b"Content-Length" and int(value) > self.request_max_size:
-            exception = PayloadTooLarge("Payload too large")
-            self.write_error(exception)
+            self.write_error(PayloadTooLarge("Payload too large"))
         try:
             value = value.decode()
         except UnicodeDecodeError:
@@ -293,7 +293,7 @@ class BoomProtocol(asyncio.Protocol):
             )
             return
 
-        # get everything we need to see if this request should proceed or not
+        # # ! get everything we need to see if this request should proceed or not
         # try:
         #     handler, middlewares, params, uri = self.router.get(self.request)
         #     self.request.uri_template = uri
@@ -301,9 +301,8 @@ class BoomProtocol(asyncio.Protocol):
         #     self.request.route_handlers = Handler(
         #         endpoint=handler, middlewares=middlewares
         #     )
-        # except SanicException as se:
-        #     self.write_error(se)
-        #     return  # whaaaat?
+        # except (MethodNotSupported, NotFound) as e:
+        #     self.write_error(e)
 
         self.request.body_finish()
         self.execute_request_handler()
@@ -313,6 +312,7 @@ class BoomProtocol(asyncio.Protocol):
             self.response_timeout, self.response_timeout_callback
         )
         self._last_request_time = _CURRENT_TIME
+
         self._request_handler_task = self.loop.create_task(
             self.request_handler(
                 self.request, self.write_response, self.stream_response

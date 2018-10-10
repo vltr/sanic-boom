@@ -2,13 +2,14 @@ import asyncio
 import inspect
 import queue
 import uuid
+
 from threading import Thread
 
 import pytest
+
 from sanic.request import Request
 
-from sanic_boom import Component
-from sanic_boom import ComponentCache
+from sanic_boom import Component, ComponentCache
 
 
 class NonCached:
@@ -243,6 +244,7 @@ async def test_thread_cached_component_multiple(some_app, sanic_request):
     async def hello(my_var: ThreadCached):
         return my_var
 
+    unique_values = 25
     some_app.add_component(ThreadCachedComponent)
     ret_queue = queue.Queue()
 
@@ -259,7 +261,7 @@ async def test_thread_cached_component_multiple(some_app, sanic_request):
                 ret = loop.run_until_complete(hello(**kw))
                 ret_queue.put(ret)
 
-    threads = [SomeThread() for _ in range(100)]
+    threads = [SomeThread() for _ in range(unique_values)]
 
     for t in threads:
         t.start()
@@ -267,9 +269,9 @@ async def test_thread_cached_component_multiple(some_app, sanic_request):
     for t in threads:
         t.join()
 
-    my_vars = [ret_queue.get_nowait() for _ in range(10000)]
+    my_vars = [ret_queue.get_nowait() for _ in range(unique_values ** 2)]
 
-    assert len(set(my_vars)) == 100
+    assert len(set(my_vars)) == unique_values
 
 
 @pytest.mark.asyncio

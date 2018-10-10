@@ -1,12 +1,15 @@
 import pytest
+
 from sanic.request import Request
 
-from sanic_boom import BoomProtocol
-from sanic_boom import CacheEngine
-from sanic_boom import Component
-from sanic_boom import Resolver
-from sanic_boom import SanicBoom
-from sanic_boom import param_parser
+from sanic_boom import (
+    BoomProtocol,
+    CacheEngine,
+    Component,
+    Resolver,
+    SanicBoom,
+    param_parser,
+)
 
 
 class SomeApp:
