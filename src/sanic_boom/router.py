@@ -43,7 +43,7 @@ class BoomRouter:
         try:
             if not isinstance(methods, Iterable):
                 raise ValueError(
-                    "Expected Iterable for methods, got {!r}".format(host)
+                    "Expected Iterable for methods, got {!r}".format(methods)
                 )
 
             if isinstance(methods, str):

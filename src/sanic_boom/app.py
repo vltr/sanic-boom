@@ -1,6 +1,5 @@
 import re
 import warnings
-
 from asyncio import CancelledError
 from inspect import isawaitable
 from traceback import format_exc
@@ -84,7 +83,7 @@ class SanicBoom(Sanic):
         replaced_vars = []
 
         for k in kwargs:
-            if re.search(r"([:|\*]{})".format(""), str(kwargs[k])):
+            if re.search(r"([:|\*])", str(kwargs[k])):
                 raise URLBuildError(
                     "The parameter '{}' passed for URL `{}` with the value of "
                     "'{}' may contain invalid characters that can break the "
@@ -153,7 +152,7 @@ class SanicBoom(Sanic):
         """Create a middleware from a decorated function."""
 
         def register_middleware(_middleware):
-            self.register_middleware(middleware=_middleware, *args[1:], **kwargs)
+            self.register_middleware(middleware=_middleware, **kwargs)
             return _middleware
 
         # Detect which way this was called, @middleware or @middleware('AT')
