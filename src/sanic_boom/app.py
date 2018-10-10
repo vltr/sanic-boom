@@ -1,5 +1,6 @@
 import re
 import warnings
+
 from asyncio import CancelledError
 from inspect import isawaitable
 from traceback import format_exc
@@ -63,13 +64,13 @@ class SanicBoom(Sanic):
                 "Endpoint with name `{}` was not found".format(view_name)
             )
 
-        if _scheme and not _external:
+        if _scheme and not _external:  # noqa copied from Sanic
             raise ValueError("When specifying _scheme, _external must be True")
 
-        if _server is None and _external:
+        if _server is None and _external:  # noqa copied from Sanic
             _server = self.config.get("SERVER_NAME", "")
 
-        if _external:
+        if _external:  # noqa copied from Sanic
             if not _scheme:
                 if ":" in _server[:8]:
                     _scheme = _server[:8].split(":", 1)[0]
@@ -79,31 +80,29 @@ class SanicBoom(Sanic):
             if "://" in _server[:8]:
                 _server = _server.split("://", 1)[-1]
 
+        orig_uri = uri
         replaced_vars = []
 
-        for k, v in kwargs.items():
-            if uri.find(k) > -1:
+        for k in kwargs:
+            if re.search(r"([:|\*]{})".format(""), str(kwargs[k])):
+                raise URLBuildError(
+                    "The parameter '{}' passed for URL `{}` with the value of "
+                    "'{}' may contain invalid characters that can break the "
+                    "URL".format(k, orig_uri, kwargs[k])
+                )
+
+            m = re.search(r"([:|\*]{})".format(k), uri)
+            if m:
                 replaced_vars.append(k)
-                uri = uri.replace(":{}".format(k), str(v))
+                uri = uri.replace(m.group(0), str(kwargs[k]))
 
         for k in replaced_vars:
             del kwargs[k]
 
-        for k in kwargs:
-            m = re.search(r"([:|\*]{})".format(k), uri)
-            if m:
-                if isinstance(kwargs[k], str):
-                    raise URLBuildError(
-                        "Endpoint with URI `{}` could not be assembled "
-                        "because provided keyword {} is not a string: "
-                        "{!s}".format(uri, k, kwargs[k])
-                    )
-                uri = uri[: m.start()] + kwargs.pop(k) + uri[m.end():]
-
         if uri.find(":") > -1 or uri.find("*") > -1:
             raise URLBuildError(
                 "Required parameters for URL `{}` was not passed to "
-                "url_for".format(uri)
+                "url_for".format(orig_uri)
             )
 
         # parse the remainder of the keyword arguments into a querystring
@@ -139,11 +138,11 @@ class SanicBoom(Sanic):
         elif isinstance(methods, (frozenset, set)):
             methods = list(methods)
 
-        if stream:  # TODO do I really need to bother with this? For now?
+        if stream:  # noqa | do I really need to bother with this? For now?
             self.is_request_stream = True
 
         def response(handler):
-            if stream:
+            if stream:  # noqa I have no idea how to handle this right now
                 handler.is_stream = stream
             self.router.add(uri, methods, handler, version=version, name=name)
             return handler
@@ -154,7 +153,7 @@ class SanicBoom(Sanic):
         """Create a middleware from a decorated function."""
 
         def register_middleware(_middleware):
-            self.register_middleware(middleware=_middleware, **kwargs)
+            self.register_middleware(middleware=_middleware, *args[1:], **kwargs)
             return _middleware
 
         # Detect which way this was called, @middleware or @middleware('AT')
