@@ -84,7 +84,9 @@ def test_middleware_component(app, srv_kw):
     async def req_middleware(headers: Headers):
         headers["uuid"] = some_uuid
 
-    @app.middleware(attach_to="response")  # ! this needs to be checked # global
+    @app.middleware(
+        attach_to="response"
+    )  # ! this needs to be checked # global
     async def resp_middleware(headers: Headers):
         assert "uuid" in headers
 

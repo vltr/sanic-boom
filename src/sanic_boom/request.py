@@ -7,14 +7,9 @@ from httptools import parse_url
 from multidict import istr
 from sanic.exceptions import InvalidUsage
 from sanic.log import error_logger
-from sanic.request import (
-    DEFAULT_HTTP_CONTENT_TYPE,
-    RequestParameters,
-    json_loads,
-    parse_multipart_form,
-)
+from sanic.request import (DEFAULT_HTTP_CONTENT_TYPE, RequestParameters,
+                           json_loads, parse_multipart_form)
 from sanic_ipware import get_client_ip
-
 
 # --------------------------------------------------------------------------- #
 # used headers
@@ -82,7 +77,7 @@ class BoomRequest(dict):
             return "<Request>"
         return "<Request: {1} {2}>".format(self.method, self.path)
 
-    def __bool__(self):
+    def __bool__(self):  # noqa
         if self.transport:
             return True
         return False

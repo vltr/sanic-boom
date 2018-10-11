@@ -208,6 +208,10 @@ def test_layered_middleware(app, srv_kw):  # 47-48
     async def middleware_handler(request):
         request["hello"] = 1
 
+    @app.middleware(uri="/hello", attach_to="response")
+    async def middleware_response_handler(request, response):
+        request["hello"] += 1
+
     @app.get("/hello/world")
     async def hello_world_handler(request):
         request["hello"] += 1
@@ -223,7 +227,7 @@ def test_layered_middleware(app, srv_kw):  # 47-48
     request, response = app.test_client.get("/hello/world", **srv_kw)
     assert response.status == 200
     assert response.text == "OK"
-    assert request["hello"] == 2
+    assert request["hello"] == 3
 
     request, response = app.test_client.get("/foo", **srv_kw)
     assert response.status == 200

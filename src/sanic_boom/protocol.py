@@ -1,29 +1,21 @@
 import asyncio
 import traceback
-
-from functools import partial
 from time import time
 
 from httptools import HttpRequestParser
 from httptools.parser.errors import HttpParserError
 from multidict import CIMultiDict
-from sanic.log import access_logger, logger
-from sanic.request import Request
-from sanic.response import HTTPResponse
-from sanic.server import Signal
-
-
-from sanic.exceptions import (  # MethodNotSupported,; NotFound,
+from sanic.exceptions import (
     InvalidUsage,
     PayloadTooLarge,
     RequestTimeout,
     ServerError,
     ServiceUnavailable,
 )
-
-
-# from sanic_boom.wrappers import Handler
-
+from sanic.log import access_logger, logger
+from sanic.request import Request
+from sanic.response import HTTPResponse
+from sanic.server import Signal
 
 try:
     import uvloop
@@ -31,9 +23,6 @@ try:
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 except ImportError:
     pass
-
-
-_CURRENT_TIME = time()
 
 
 class BoomProtocol(asyncio.Protocol):
@@ -145,7 +134,7 @@ class BoomProtocol(asyncio.Protocol):
             self.request_timeout, self.request_timeout_callback
         )
         self.transport = transport
-        self._last_request_time = _CURRENT_TIME
+        self._last_request_time = time()
 
     def connection_lost(self, exc):
         self.connections.discard(self)
@@ -167,7 +156,7 @@ class BoomProtocol(asyncio.Protocol):
         # exactly what this timeout is checking for.
         # Check if elapsed time since request initiated exceeds our
         # configured maximum request timeout value
-        time_elapsed = _CURRENT_TIME - self._last_request_time
+        time_elapsed = time() - self._last_request_time
         if time_elapsed < self.request_timeout:
             time_left = self.request_timeout - time_elapsed
             self._request_timeout_handler = self.loop.call_later(
@@ -183,7 +172,7 @@ class BoomProtocol(asyncio.Protocol):
     def response_timeout_callback(self):
         # Check if elapsed time since response was initiated exceeds our
         # configured maximum request timeout value
-        time_elapsed = _CURRENT_TIME - self._last_request_time
+        time_elapsed = time() - self._last_request_time
         if time_elapsed < self.response_timeout:
             time_left = self.response_timeout - time_elapsed
             self._response_timeout_handler = self.loop.call_later(
@@ -199,7 +188,7 @@ class BoomProtocol(asyncio.Protocol):
     def keep_alive_timeout_callback(self):
         # Check if elapsed time since last response exceeds our configured
         # maximum keep alive timeout value
-        time_elapsed = _CURRENT_TIME - self._last_response_time
+        time_elapsed = time() - self._last_response_time
         if time_elapsed < self.keep_alive_timeout:
             time_left = self.keep_alive_timeout - time_elapsed
             self._keep_alive_timeout_handler = self.loop.call_later(
@@ -311,7 +300,7 @@ class BoomProtocol(asyncio.Protocol):
         self._response_timeout_handler = self.loop.call_later(
             self.response_timeout, self.response_timeout_callback
         )
-        self._last_request_time = _CURRENT_TIME
+        self._last_request_time = time()
 
         self._request_handler_task = self.loop.create_task(
             self.request_handler(
@@ -388,7 +377,7 @@ class BoomProtocol(asyncio.Protocol):
                 self._keep_alive_timeout_handler = self.loop.call_later(
                     self.keep_alive_timeout, self.keep_alive_timeout_callback
                 )
-                self._last_response_time = _CURRENT_TIME
+                self._last_response_time = time()
                 self.cleanup()
 
     async def drain(self):
@@ -441,7 +430,7 @@ class BoomProtocol(asyncio.Protocol):
                 self._keep_alive_timeout_handler = self.loop.call_later(
                     self.keep_alive_timeout, self.keep_alive_timeout_callback
                 )
-                self._last_response_time = _CURRENT_TIME
+                self._last_response_time = time()
                 self.cleanup()
 
     def write_error(self, exception):
@@ -519,15 +508,3 @@ class BoomProtocol(asyncio.Protocol):
         if self.transport is not None:
             self.transport.close()
             self.transport = None
-
-
-def update_current_time(loop):
-    """Cache the current time, since it is needed at the end of every
-    keep-alive request to update the request timeout time
-
-    :param loop:
-    :return:
-    """
-    global _CURRENT_TIME
-    _CURRENT_TIME = time()
-    loop.call_later(1, partial(update_current_time, loop))

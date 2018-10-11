@@ -7,7 +7,7 @@ from urllib.parse import urlencode, urlunparse
 
 from sanic import Sanic
 from sanic.constants import HTTP_METHODS
-from sanic.exceptions import SanicException, ServerError, URLBuildError
+from sanic.exceptions import SanicException, URLBuildError
 from sanic.log import error_logger
 from sanic.response import HTTPResponse, StreamingHTTPResponse
 
@@ -214,13 +214,6 @@ class SanicBoom(Sanic):
                 # middlewares = self.request.route_handlers.middlewares
                 # kwargs = self.request.route_params
 
-                if handler is None:
-                    raise ServerError(
-                        (
-                            "'None' was returned while requesting a "
-                            "handler from the router"
-                        )
-                    )
                 # run layered request middlewares
                 request_middleware = [
                     m.handler
@@ -309,7 +302,7 @@ class SanicBoom(Sanic):
                 raise CancelledError()
 
         # pass the response to the correct callback
-        if isinstance(response, StreamingHTTPResponse):
+        if isinstance(response, StreamingHTTPResponse):  # noqa copied code
             await stream_callback(response)
         else:
             write_callback(response)
