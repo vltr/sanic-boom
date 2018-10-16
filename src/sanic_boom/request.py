@@ -30,26 +30,11 @@ class BoomRequest(dict):
 
     __slots__ = (
         "__weakref__",
-        "_body",
-        "_cookies",
-        "_ip",
-        "_path",
+        "_data",
         "_parsed_url",
-        "_port",
-        "_query_string",
-        "_remote_addr",
-        # "_route_handlers",
-        # "_route_params",
-        "_socket",
-        "_scheme",
-        "_app",
         "body",
         "headers",
         "method",
-        "parsed_args",
-        "parsed_files",
-        "parsed_form",
-        "parsed_json",
         "raw_url",
         "stream",
         "transport",
@@ -61,21 +46,18 @@ class BoomRequest(dict):
         self.raw_url = url_bytes
         # TODO: see https://github.com/huge-success/sanic/issues/1329
         self._parsed_url = parse_url(url_bytes)
-        # self.app = None
 
         self.headers = headers
         self.version = version
         self.method = method
         self.transport = transport
         self.stream = None
-
-    def __has(self, key):
-        return hasattr(self, key)
+        self._data = {}
 
     def __repr__(self):
         if self.method is None or not self.path:
-            return "<Request>"
-        return "<Request: {1} {2}>".format(self.method, self.path)
+            return "<BoomRequest>"
+        return "<BoomRequest: {1} {2}>".format(self.method, self.path)
 
     def __bool__(self):  # noqa
         if self.transport:
@@ -87,18 +69,32 @@ class BoomRequest(dict):
     # ----------------------------------------------------------------------- #
 
     def body_append(self, data):
-        if not self.__has("_body"):
-            self._body = BytesIO()
-        if self._body.closed:
+        if "_body" not in self._data:
+            self._data["_body"] = BytesIO()
+        if self._data["_body"].closed:
             raise IOError("the body is already closed")  # TODO fix
-        self._body.write(data)
+        self._data["_body"].write(data)
 
     def body_finish(self):
-        if self.__has("_body"):
-            self.body = self._body.getvalue()
-            self._body.close()
+        if "_body" in self._data:
+            self.body = self._data["_body"].getvalue()
+            self._data["_body"].close()
         else:
             self.body = b""
+
+    def _load_json(self, loads=json_loads):
+        try:
+            self._data["parsed_json"] = loads(self.body)
+        except Exception:
+            if not self.body:
+                return
+            raise InvalidUsage("Failed parsing the body as json")
+
+    def _get_address(self):
+        _socket = self.transport.get_extra_info("peername") or (None, None)
+        self._data["_socket"] = _socket
+        self._data["_ip"] = _socket[0]
+        self._data["_port"] = _socket[1]
 
     # ----------------------------------------------------------------------- #
     # properties
@@ -106,86 +102,63 @@ class BoomRequest(dict):
 
     @property
     def app(self):
-        if self.__has("_app"):
-            return self._app
+        if "_app" in self._data:
+            return self._data["_app"]
         return None
 
     @app.setter
     def app(self, value):
-        if self.app is None:
-            self._app = value
-
-    # @property
-    # def route_params(self):
-    #     if self.__has("_route_params"):
-    #         return self._route_params
-    #     return None
-
-    # @route_params.setter
-    # def route_params(self, value):
-    #     if self.route_params is None:
-    #         self._route_params = value
-
-    # @property
-    # def route_handlers(self):
-    #     if self.__has("_route_handlers"):
-    #         return self._route_handlers
-    #     return None
-
-    # @route_handlers.setter
-    # def route_handlers(self, value):
-    #     if self.route_handlers is None:
-    #         self._route_handlers = value
+        if "_app" not in self._data:
+            self._data["_app"] = value
 
     @property
     def json(self):
-        if not self.__has("parsed_json"):
+        if "parsed_json" not in self._data:
             self._load_json()
-
-        return self.parsed_json
+        return self._data["parsed_json"]
 
     @property
     def form(self):
-        if not self.__has("parsed_form"):
-            self.parsed_form = RequestParameters()
-            self.parsed_files = RequestParameters()
+        if "parsed_form" not in self._data:
+            self._data["parsed_form"] = RequestParameters()
+            self._data["parsed_files"] = RequestParameters()
             content_type = self.headers.get(
                 _H_CONTENT_TYPE, DEFAULT_HTTP_CONTENT_TYPE
             )
             content_type, parameters = parse_header(content_type)
             try:
                 if content_type == "application/x-www-form-urlencoded":
-                    self.parsed_form = RequestParameters(
+                    self._data["parsed_form"] = RequestParameters(
                         parse_qs(self.body.decode("utf-8"))
                     )
                 elif content_type == "multipart/form-data":
                     # TODO: Stream this instead of reading to/from memory
                     boundary = parameters["boundary"].encode("utf-8")
-                    self.parsed_form, self.parsed_files = parse_multipart_form(
+                    parsed_form, parsed_files = parse_multipart_form(
                         self.body, boundary
                     )
+                    self._data["parsed_form"] = parsed_form
+                    self._data["parsed_files"] = parsed_files
             except Exception:
                 error_logger.exception("Failed when parsing form")
-
-        return self.parsed_form
+        return self._data["parsed_form"]
 
     @property
     def files(self):
-        if not self.__has("parsed_files"):
+        if "parsed_files" not in self._data:
             self.form  # compute form to get files
-
-        return self.parsed_files
+        return self._data["parsed_files"]
 
     @property
     def args(self):
-        if not self.__has("parsed_args"):
+        if "parsed_args" not in self._data:
             if self.query_string:
-                self.parsed_args = RequestParameters(
+                self._data["parsed_args"] = RequestParameters(
                     parse_qs(self.query_string)
                 )
             else:
-                self.parsed_args = RequestParameters()
-        return self.parsed_args
+                self._data["parsed_args"] = RequestParameters()
+        return self._data["parsed_args"]
 
     @property
     def raw_args(self):
@@ -193,54 +166,39 @@ class BoomRequest(dict):
 
     @property
     def cookies(self):
-        if not self.__has("_cookies"):
+        if "_cookies" not in self._data:
             cookie = self.headers.get(_H_COOKIE)
+            _cookies = {}
             if cookie is not None:
                 cookies = SimpleCookie()
                 cookies.load(cookie)
-                self._cookies = {
+                _cookies = {
                     name: cookie.value for name, cookie in cookies.items()
                 }
-            else:
-                self._cookies = {}
-        return self._cookies
+            self._data["_cookies"] = _cookies
+        return self._data["_cookies"]
 
     @property
     def ip(self):
-        if not self.__has("_socket"):
+        if "_socket" not in self._data:
             self._get_address()
-        return self._ip
+        return self._data["_ip"]
 
     @property
     def port(self):
-        if not self.__has("_socket"):
+        if "_socket" not in self._data:
             self._get_address()
-        return self._port
+        return self._data["_port"]
 
     @property
     def socket(self):
-        if not self.__has("_socket"):
+        if "_socket" not in self._data:
             self._get_address()
-        return self._socket
-
-    def _load_json(self, loads=json_loads):
-        try:
-            self.parsed_json = loads(self.body)
-        except Exception:
-            if not self.body:
-                return
-            raise InvalidUsage("Failed parsing the body as json")
-
-    def _get_address(self):
-        self._socket = self.transport.get_extra_info("peername") or (
-            None,
-            None,
-        )
-        self._ip, self._port = self._socket[0], self._socket[1]
+        return self._data["_socket"]
 
     @property
     def remote_addr(self):
-        if not self.__has("_remote_addr"):
+        if "_remote_addr" not in self._data:
             proxy_count = None
             proxy_trusted_ips = None
             request_header_order = None
@@ -260,25 +218,26 @@ class BoomRequest(dict):
                 proxy_trusted_ips=proxy_trusted_ips,
                 request_header_order=request_header_order,
             )
-            self._remote_addr = ip
-        return self._remote_addr
+            self._data["_remote_addr"] = ip
+        return self._data["_remote_addr"]
 
     @property
     def scheme(self):
-        if not self.__has("_scheme"):
+        if "_scheme" not in self._data:
+            _scheme = "http"
             if (
                 self.app
                 and self.app.websocket_enabled
                 and self.headers.get(_H_UPGRADE) == "websocket"
             ):
-                self._scheme = "ws"
-            else:
-                self._scheme = "http"
+                _scheme = "ws"
 
             if self.transport.get_extra_info("sslcontext"):
-                self._scheme += "s"
+                _scheme += "s"
 
-        return self._scheme
+            self._data["_scheme"] = _scheme
+
+        return self._data["_scheme"]
 
     @property
     def host(self):
@@ -292,18 +251,20 @@ class BoomRequest(dict):
 
     @property
     def path(self):
-        if not self.__has("_path"):
-            self._path = self._parsed_url.path.decode("utf-8")
-        return self._path
+        if "_path" not in self._data:
+            self._data["_path"] = self._parsed_url.path.decode("utf-8")
+        return self._data["_path"]
 
     @property
     def query_string(self):
-        if not self.__has("_query_string"):
+        if "_query_string" not in self._data:
             if self._parsed_url.query:
-                self._query_string = self._parsed_url.query.decode("utf-8")
+                self._data["_query_string"] = self._parsed_url.query.decode(
+                    "utf-8"
+                )
             else:
-                self._query_string = ""
-        return self._query_string
+                self._data["_query_string"] = ""
+        return self._data["_query_string"]
 
     @property
     def url(self):

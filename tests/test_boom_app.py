@@ -70,7 +70,6 @@ def test_response_timeout(app, srv_kw):
 
 
 def test_handler_exception(app, srv_kw):
-
     class CustomException(Exception):
         pass
 
