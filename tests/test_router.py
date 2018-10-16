@@ -7,7 +7,7 @@ from sanic.router import RouteExists
 
 
 @pytest.mark.parametrize("method", HTTP_METHODS)
-def test_versioned_routes_get(app, method, srv_kw):
+def test_versioned_routes_get(app, method):
     method = method.lower()
 
     func = getattr(app, method)
@@ -21,23 +21,23 @@ def test_versioned_routes_get(app, method, srv_kw):
 
     client_method = getattr(app.test_client, method)
 
-    request, response = client_method("/v1/{}".format(method), **srv_kw)
+    request, response = client_method("/v1/{}".format(method))
     assert response.status == 200
 
 
-def test_shorthand_routes_get(app, srv_kw):
+def test_shorthand_routes_get(app):
     @app.get("/get")
     async def handler(request):
         return text("OK")
 
-    request, response = app.test_client.get("/get", **srv_kw)
+    request, response = app.test_client.get("/get")
     assert response.text == "OK"
 
-    request, response = app.test_client.post("/get", **srv_kw)
+    request, response = app.test_client.post("/get")
     assert response.status == 405
 
 
-def test_shorthand_routes_multiple(app, srv_kw):
+def test_shorthand_routes_multiple(app):
     @app.get("/get")
     async def get_handler(request):
         return text("OK")
@@ -46,23 +46,23 @@ def test_shorthand_routes_multiple(app, srv_kw):
     async def options_handler(request):
         return text("")
 
-    request, response = app.test_client.get("/get/", **srv_kw)
+    request, response = app.test_client.get("/get/")
     assert response.status == 200
     assert response.text == "OK"
 
-    request, response = app.test_client.options("/get/", **srv_kw)
+    request, response = app.test_client.options("/get/")
     assert response.status == 200
 
     # there's no strict slashes for mental health
-    request, response = app.test_client.get("/get", **srv_kw)
+    request, response = app.test_client.get("/get")
     assert response.status == 200
     assert response.text == "OK"
 
-    request, response = app.test_client.options("/get", **srv_kw)
+    request, response = app.test_client.options("/get")
     assert response.status == 200
 
 
-def test_route_slashes_overload(app, srv_kw):
+def test_route_slashes_overload(app):
     @app.get("/hello/")
     async def get_handler(request):
         return text("OK")
@@ -71,32 +71,32 @@ def test_route_slashes_overload(app, srv_kw):
     async def post_handler(request):
         return text("OK")
 
-    request, response = app.test_client.get("/hello", **srv_kw)
+    request, response = app.test_client.get("/hello")
     assert response.text == "OK"
 
-    request, response = app.test_client.get("/hello/", **srv_kw)
+    request, response = app.test_client.get("/hello/")
     assert response.text == "OK"
 
-    request, response = app.test_client.post("/hello", **srv_kw)
+    request, response = app.test_client.post("/hello")
     assert response.text == "OK"
 
-    request, response = app.test_client.post("/hello/", **srv_kw)
+    request, response = app.test_client.post("/hello/")
     assert response.text == "OK"
 
 
-def test_shorthand_routes_post(app, srv_kw):
+def test_shorthand_routes_post(app):
     @app.post("/post")
     async def handler(request):
         return text("OK")
 
-    request, response = app.test_client.post("/post", **srv_kw)
+    request, response = app.test_client.post("/post")
     assert response.text == "OK"
 
-    request, response = app.test_client.get("/post", **srv_kw)
+    request, response = app.test_client.get("/post")
     assert response.status == 405
 
 
-def test_shorthand_routes_put(app, srv_kw):
+def test_shorthand_routes_put(app):
     @app.put("/put")
     async def handler(request):
         assert request.stream is None
@@ -104,14 +104,14 @@ def test_shorthand_routes_put(app, srv_kw):
 
     assert app.is_request_stream is False
 
-    request, response = app.test_client.put("/put", **srv_kw)
+    request, response = app.test_client.put("/put")
     assert response.text == "OK"
 
-    request, response = app.test_client.get("/put", **srv_kw)
+    request, response = app.test_client.get("/put")
     assert response.status == 405
 
 
-def test_shorthand_routes_delete(app, srv_kw):
+def test_shorthand_routes_delete(app):
     @app.delete("/delete")
     async def handler(request):
         assert request.stream is None
@@ -119,14 +119,14 @@ def test_shorthand_routes_delete(app, srv_kw):
 
     assert app.is_request_stream is False
 
-    request, response = app.test_client.delete("/delete", **srv_kw)
+    request, response = app.test_client.delete("/delete")
     assert response.text == "OK"
 
-    request, response = app.test_client.get("/delete", **srv_kw)
+    request, response = app.test_client.get("/delete")
     assert response.status == 405
 
 
-def test_shorthand_routes_patch(app, srv_kw):
+def test_shorthand_routes_patch(app):
     @app.patch("/patch")
     async def handler(request):
         assert request.stream is None
@@ -134,14 +134,14 @@ def test_shorthand_routes_patch(app, srv_kw):
 
     assert app.is_request_stream is False
 
-    request, response = app.test_client.patch("/patch", **srv_kw)
+    request, response = app.test_client.patch("/patch")
     assert response.text == "OK"
 
-    request, response = app.test_client.get("/patch", **srv_kw)
+    request, response = app.test_client.get("/patch")
     assert response.status == 405
 
 
-def test_shorthand_routes_head(app, srv_kw):
+def test_shorthand_routes_head(app):
     @app.head("/head")
     async def handler(request):
         assert request.stream is None
@@ -149,14 +149,14 @@ def test_shorthand_routes_head(app, srv_kw):
 
     assert app.is_request_stream is False
 
-    request, response = app.test_client.head("/head", **srv_kw)
+    request, response = app.test_client.head("/head")
     assert response.status == 200
 
-    request, response = app.test_client.get("/head", **srv_kw)
+    request, response = app.test_client.get("/head")
     assert response.status == 405
 
 
-def test_shorthand_routes_options(app, srv_kw):
+def test_shorthand_routes_options(app):
     @app.options("/options")
     async def handler(request):
         assert request.stream is None
@@ -164,10 +164,10 @@ def test_shorthand_routes_options(app, srv_kw):
 
     assert app.is_request_stream is False
 
-    request, response = app.test_client.options("/options", **srv_kw)
+    request, response = app.test_client.options("/options")
     assert response.status == 200
 
-    request, response = app.test_client.get("/options", **srv_kw)
+    request, response = app.test_client.get("/options")
     assert response.status == 405
 
 
@@ -183,27 +183,27 @@ def test_register_same_route(app):
             return text("Not OK")  # noqa
 
 
-def test_route_not_found(app, srv_kw):
+def test_route_not_found(app):
     @app.get("/hello")
     async def handler(request):
         return text("OK")  # noqa
 
-    request, response = app.test_client.get("/world", **srv_kw)
+    request, response = app.test_client.get("/world")
     assert response.status == 404
 
 
-def test_is_stream_handler_warning(app, srv_kw):
+def test_is_stream_handler_warning(app):
     @app.get("/hello")
     async def handler(request):
         with pytest.warns(RuntimeWarning):
             assert request.app.router.is_stream_handler(request) is False
         return text("OK")
 
-    request, response = app.test_client.get("/hello", **srv_kw)
+    request, response = app.test_client.get("/hello")
     assert response.status == 200
 
 
-def test_layered_middleware(app, srv_kw):  # 47-48
+def test_layered_middleware(app):  # 47-48
     @app.middleware(uri="/hello")
     async def middleware_handler(request):
         request["hello"] = 1
@@ -221,21 +221,21 @@ def test_layered_middleware(app, srv_kw):  # 47-48
     async def foo_handler(request):
         return text("BAR")
 
-    request, response = app.test_client.get("/hello", **srv_kw)
+    request, response = app.test_client.get("/hello")
     assert response.status == 404
 
-    request, response = app.test_client.get("/hello/world", **srv_kw)
+    request, response = app.test_client.get("/hello/world")
     assert response.status == 200
     assert response.text == "OK"
     assert request["hello"] == 3
 
-    request, response = app.test_client.get("/foo", **srv_kw)
+    request, response = app.test_client.get("/foo")
     assert response.status == 200
     assert response.text == "BAR"
     assert "hello" not in request
 
 
-def test_blueprint(app, srv_kw):
+def test_blueprint(app):
     bp = Blueprint("test_text", url_prefix="/test")
 
     @bp.get("/get")
@@ -244,14 +244,14 @@ def test_blueprint(app, srv_kw):
 
     app.blueprint(bp)
 
-    request, response = app.test_client.get("/test/get/", **srv_kw)
+    request, response = app.test_client.get("/test/get/")
     assert response.status == 200
 
-    request, response = app.test_client.get("/test/get", **srv_kw)
+    request, response = app.test_client.get("/test/get")
     assert response.status == 200
 
 
-def test_find_route_by_view_name(app, srv_kw):
+def test_find_route_by_view_name(app):
     bp = Blueprint("test_text", url_prefix="/test")
 
     @bp.get("/get")
@@ -269,7 +269,7 @@ def test_find_route_by_view_name(app, srv_kw):
         app.url_for(None)
 
 
-def test_error_on_same_variable_names(app, srv_kw):
+def test_error_on_same_variable_names(app):
     with pytest.raises(ValueError):
 
         @app.get("/hello/:variable/:variable")
@@ -283,7 +283,7 @@ def test_error_on_same_variable_names(app, srv_kw):
             pass
 
 
-def test_variable_name_substitution(app, srv_kw):
+def test_variable_name_substitution(app):
     @app.get("/get/:command/:id/*src")
     async def handler(request):  # noqa
         pass
@@ -342,7 +342,7 @@ def test_duplicate_name_for_handlers(app):
             return text("OK")  # noqa
 
 
-def test_basic_component_handling(app, srv_kw):
+def test_basic_component_handling(app):
     @app.get("/test/:command/:identifier")
     async def handler(command: str, identifier: int):
         assert isinstance(command, str)
@@ -351,5 +351,5 @@ def test_basic_component_handling(app, srv_kw):
         assert identifier == 42
         return text("OK")
 
-    request, response = app.test_client.get("/test/error/42", **srv_kw)
+    request, response = app.test_client.get("/test/error/42")
     assert response.status == 200

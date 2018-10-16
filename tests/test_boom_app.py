@@ -36,7 +36,7 @@ def test_initialization():
         app.remove_route("/foo")
 
 
-def test_prepend_slash(app, srv_kw):
+def test_prepend_slash(app):
     @app.middleware(uri="foo")
     async def my_middleware(request):
         request["foo_is_/foo"] = 1
@@ -45,13 +45,13 @@ def test_prepend_slash(app, srv_kw):
     async def handler(request):
         return text("OK")
 
-    request, response = app.test_client.get("/foo", **srv_kw)
+    request, response = app.test_client.get("/foo")
     assert response.status == 200
     assert response.text == "OK"
     assert request["foo_is_/foo"] == 1
 
 
-def test_response_timeout(app, srv_kw):
+def test_response_timeout(app):
 
     app.config["RESPONSE_TIMEOUT"] = 1
 
@@ -64,12 +64,12 @@ def test_response_timeout(app, srv_kw):
     def handler_exception(request, exception):
         return text("timeout", 503)
 
-    request, response = app.test_client.get("/foo", **srv_kw)
+    request, response = app.test_client.get("/foo")
     assert response.status == 503
     assert response.text == "timeout"
 
 
-def test_handler_exception(app, srv_kw):
+def test_handler_exception(app):
     class CustomException(Exception):
         pass
 
@@ -81,5 +81,5 @@ def test_handler_exception(app, srv_kw):
     def handler_exception(request, exception):
         raise Exception
 
-    request, response = app.test_client.get("/foo", **srv_kw)
+    request, response = app.test_client.get("/foo")
     assert response.status == 500

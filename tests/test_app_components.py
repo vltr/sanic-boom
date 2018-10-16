@@ -62,7 +62,7 @@ class RequestIdentifierComponent(Component):
         return ComponentCache.REQUEST
 
 
-def test_handler_component(app, srv_kw):
+def test_handler_component(app):
     app.add_component(JSONBodyComponent)
 
     @app.post("/")
@@ -70,13 +70,13 @@ def test_handler_component(app, srv_kw):
         return text(body.get("hello"))
 
     request, response = app.test_client.post(
-        "/", data=json.dumps({"hello": "world"}), **srv_kw
+        "/", data=json.dumps({"hello": "world"})
     )
     assert response.status == 200
     assert response.text == "world"
 
 
-def test_middleware_component(app, srv_kw):
+def test_middleware_component(app):
     app.add_component(HeaderComponent)
     some_uuid = str(uuid.uuid4())
 
@@ -94,12 +94,12 @@ def test_middleware_component(app, srv_kw):
     async def handler(headers: Headers):
         return text(headers.get("uuid"))
 
-    request, response = app.test_client.get("/uuid", **srv_kw)
+    request, response = app.test_client.get("/uuid")
     assert response.status == 200
     assert response.text == some_uuid
 
 
-def test_complex_component(app, srv_kw):
+def test_complex_component(app):
     class TestBody:
         def __init__(self, name=None, age=None):
             self.name = name
@@ -122,13 +122,13 @@ def test_complex_component(app, srv_kw):
         return text(complex_body.say_hi())
 
     request, response = app.test_client.post(
-        "/", data=json.dumps({"name": "John", "age": 42}), **srv_kw
+        "/", data=json.dumps({"name": "John", "age": 42})
     )
     assert response.status == 200
     assert response.text == "John, aged 42, says hi"
 
 
-def test_cached_component(app, srv_kw):
+def test_cached_component(app):
 
     app.add_component(RequestIdentifierComponent)
 
@@ -141,11 +141,11 @@ def test_cached_component(app, srv_kw):
         request[req_uuid] += 1
         return text(req_uuid)
 
-    request, response = app.test_client.get("/uuid", **srv_kw)
+    request, response = app.test_client.get("/uuid")
     assert response.status == 200
     assert request[response.text] == 2
 
     # the cache is only valid for the request lifecycle
-    request, response = app.test_client.get("/uuid", **srv_kw)
+    request, response = app.test_client.get("/uuid")
     assert response.status == 200
     assert request[response.text] == 2

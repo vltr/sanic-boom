@@ -1,9 +1,7 @@
 import pytest
-
 from sanic.request import Request
 
 from sanic_boom import (
-    BoomProtocol,
     CacheEngine,
     Component,
     Resolver,
@@ -45,8 +43,3 @@ def some_app():
 @pytest.fixture
 def app(request):
     return SanicBoom(request.node.name)
-
-
-@pytest.fixture
-def srv_kw():
-    return {"server_kwargs": {"protocol": BoomProtocol}}

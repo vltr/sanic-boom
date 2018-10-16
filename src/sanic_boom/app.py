@@ -13,7 +13,6 @@ from sanic.response import HTTPResponse, StreamingHTTPResponse
 
 from sanic_boom.cache import CacheEngine
 from sanic_boom.component import Component
-from sanic_boom.protocol import BoomProtocol
 from sanic_boom.references import DOC_LINKS as dl
 from sanic_boom.request import BoomRequest
 from sanic_boom.resolver import Resolver
@@ -331,40 +330,6 @@ class SanicBoom(Sanic):
                 response = _response
                 break
         return response
-
-    # ----------------------------------------------------------------------- #
-    # oof, here we go
-    # ----------------------------------------------------------------------- #
-
-    def run(
-        self,
-        host=None,
-        port=None,
-        debug=False,
-        ssl=None,
-        sock=None,
-        workers=1,
-        protocol=BoomProtocol,
-        backlog=100,
-        stop_event=None,
-        register_sys_signals=True,
-        access_log=True,
-        **kwargs
-    ):
-        super().run(
-            host=host,
-            port=port,
-            debug=debug,
-            ssl=ssl,
-            sock=sock,
-            workers=workers,
-            protocol=protocol,
-            backlog=backlog,
-            stop_event=stop_event,
-            register_sys_signals=register_sys_signals,
-            access_log=access_log,
-            **kwargs
-        )
 
     # ----------------------------------------------------------------------- #
     # what doesn't make any sense for building APIs
