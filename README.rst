@@ -32,7 +32,7 @@
     :alt: Coverage Status
     :target: https://codecov.io/github/vltr/sanic-boom
 
-.. image:: https://api.codacy.com/project/badge/Grade/6425ac0a119f481bb4f2b269bd7f52fc
+.. image:: https://api.codacy.com/project/badge/Grade/633a45702c6c43a3815ed7199a0be7b2
     :alt: Codacy Grade
     :target: https://www.codacy.com/app/vltr/sanic-boom?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=vltr/sanic-boom&amp;utm_campaign=Badge_Grade
 
