@@ -20,10 +20,6 @@
     :alt: Travis-CI Build Status
     :target: https://travis-ci.org/vltr/sanic-boom
 
-.. image:: https://ci.appveyor.com/api/projects/status/github/vltr/sanic-boom?branch=master&svg=true
-    :alt: AppVeyor Build Status
-    :target: https://ci.appveyor.com/project/vltr/sanic-boom
-
 .. image:: https://readthedocs.org/projects/sanic-boom/badge/?style=flat
     :target: https://readthedocs.org/projects/sanic-boom
     :alt: Documentation Status
@@ -47,10 +43,112 @@ Components injection, fast routing and non-global (layered) middlewares. Give yo
 In a nutshell
 -------------
 
-.. literalinclude:: examples/marshmallow-integration.py
-   :language: python
-   :emphasize-lines: 48-81
-   :linenos:
+.. code-block:: python
+
+    """Example code taken from
+    https://marshmallow.readthedocs.io/en/3.0/quickstart.html#quickstart
+    """
+
+    import datetime as dt
+    import inspect
+    import typing as t
+
+    from marshmallow import Schema, fields, post_load
+    from sanic.exceptions import ServerError
+    from sanic.response import text
+
+    from sanic_boom import Component, SanicBoom
+
+    # --------------------------------------------------------------------------- #
+    # marshmallow related code
+    # --------------------------------------------------------------------------- #
+
+
+    class User(object):
+        def __init__(self, name, email):
+            self.name = name
+            self.email = email
+            self.created_at = dt.datetime.now()
+
+        def __repr__(self):
+            return "<User(name={self.name!r})>".format(self=self)
+
+        def say_hi(self):
+            return "hi, my name is {}".format(self.name)
+
+
+    class UserSchema(Schema):
+        name = fields.Str()
+        email = fields.Email()
+        created_at = fields.DateTime()
+
+        @post_load
+        def make_user(self, data):
+            return User(**data)
+
+
+    # --------------------------------------------------------------------------- #
+    # sanic-boom related code
+    # --------------------------------------------------------------------------- #
+
+
+    class JSONBody(t.Generic[t.T_co]):
+        pass
+
+
+    class JSONBodyComponent(Component):
+        def resolve(self, param: inspect.Parameter) -> bool:
+            if hasattr(param.annotation, "__origin__"):
+                return param.annotation.__origin__ == JSONBody
+            return False
+
+        async def get(self, request, param: inspect.Parameter) -> object:
+            inferred_type = param.annotation.__args__[0]
+            try:
+                return inferred_type().load(request.json).data
+            except Exception:
+                raise ServerError(
+                    "Couldn't convert JSON body to {!s}".format(inferred_type)
+                )
+
+
+    app = SanicBoom(__name__)
+    app.add_component(JSONBodyComponent)
+
+
+    @app.post("/")
+    async def handler(user: JSONBody[UserSchema]):  # notice the handler parameters
+        return text(user.say_hi())
+
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8000, workers=1)
+
+::
+
+    $ curl -v http://localhost:8000/ -d '{"name":"John Doe","email":"john.doe@example.tld"}'
+    *   Trying ::1...
+    * TCP_NODELAY set
+    * connect to ::1 port 8000 failed: Connection refused
+    *   Trying 127.0.0.1...
+    * TCP_NODELAY set
+    * Connected to localhost (127.0.0.1) port 8000 (#0)
+    > POST / HTTP/1.1
+    > Host: localhost:8000
+    > User-Agent: curl/7.61.1
+    > Accept: */*
+    > Content-Length: 50
+    > Content-Type: application/x-www-form-urlencoded
+    >
+    * upload completely sent off: 50 out of 50 bytes
+    < HTTP/1.1 200 OK
+    < Connection: keep-alive
+    < Keep-Alive: 5
+    < Content-Length: 23
+    < Content-Type: text/plain; charset=utf-8
+    <
+    * Connection #0 to host localhost left intact
+    hi, my name is John Doe
 
 .. warning::
 
