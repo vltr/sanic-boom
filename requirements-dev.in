@@ -3,6 +3,7 @@ bumpversion
 coverage
 doc8
 flake8
+isort
 pycodestyle
 pygments
 pytest

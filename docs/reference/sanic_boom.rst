@@ -1,9 +1,9 @@
-middle-schema
-=============
+sanic-boom
+==========
 
 .. testsetup::
 
-    from middle_schema import *
+    from sanic_boom import *
 
-.. automodule:: middle_schema
+.. automodule:: sanic_boom
     :members:

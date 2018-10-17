@@ -54,7 +54,7 @@ class SanicBoom(Sanic):
         _method: object = None,
         **kwargs
     ):
-        # i think this should be in the Router
+        # ? i think this should be in the Router
         uri, route = self.router.find_route_by_view_name(view_name)
 
         if not (uri and route):
@@ -62,13 +62,13 @@ class SanicBoom(Sanic):
                 "Endpoint with name `{}` was not found".format(view_name)
             )
 
-        if _scheme and not _external:  # noqa copied from Sanic
+        if _scheme and not _external:
             raise ValueError("When specifying _scheme, _external must be True")
 
-        if _server is None and _external:  # noqa copied from Sanic
+        if _server is None and _external:
             _server = self.config.get("SERVER_NAME", "")
 
-        if _external:  # noqa copied from Sanic
+        if _external:
             if not _scheme:
                 if ":" in _server[:8]:
                     _scheme = _server[:8].split(":", 1)[0]
@@ -93,6 +93,7 @@ class SanicBoom(Sanic):
             if m:
                 replaced_vars.append(k)
                 uri = uri.replace(m.group(0), str(kwargs[k]))
+            # else log ?
 
         for k in replaced_vars:
             del kwargs[k]
@@ -240,7 +241,7 @@ class SanicBoom(Sanic):
             # issue a response.
             response = None
             cancelled = True
-        except Exception as e:
+        except Exception as e:  # noqa this was copied from Sanic "as is"
             # -------------------------------------------- #
             # Response Generation Failed
             # -------------------------------------------- #

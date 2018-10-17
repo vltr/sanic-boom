@@ -1,6 +1,5 @@
 import inspect
 import typing as t
-
 from functools import lru_cache
 
 from sanic.request import Request

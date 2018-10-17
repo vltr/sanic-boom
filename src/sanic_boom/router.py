@@ -5,10 +5,10 @@ from functools import lru_cache
 
 from sanic.exceptions import MethodNotSupported, NotFound
 from sanic.router import ROUTER_CACHE_SIZE, RouteExists
+from xrtr import RadixTree
 
 from sanic_boom.references import DOC_LINKS as dl
 from sanic_boom.wrappers import Middleware, MiddlewareType, Route
-from xrtr import RadixTree
 
 
 class BoomRouter:

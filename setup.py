@@ -17,8 +17,8 @@ setup(
     name="sanic-boom",
     version="0.1.0",
     license="MIT license",
-    description="Component injection and caching, faster routing system and "
-    "non-global middlewares. Give your Sanic application a Boom!",
+    description="Components injection, fast routing and non-global (layered) "
+    "middlewares. Give your Sanic application a Boom!",
     long_description="%s\n%s"
     % (
         re.compile("^.. start-badges.*^.. end-badges", re.M | re.S).sub(
@@ -49,7 +49,7 @@ setup(
         # 'Programming Language :: Python :: Implementation :: PyPy',
         "Topic :: Utilities",
     ],
-    keywords=[],
+    keywords=["sanic", "components", "lifecycle", "productivity"],
     install_requires=[
         "Sanic>=0.8.0",
         "xrtr>=0.2.1",

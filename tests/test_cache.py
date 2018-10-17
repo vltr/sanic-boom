@@ -2,11 +2,9 @@ import asyncio
 import inspect
 import queue
 import uuid
-
 from threading import Thread
 
 import pytest
-
 from sanic.request import Request
 
 from sanic_boom import Component, ComponentCache

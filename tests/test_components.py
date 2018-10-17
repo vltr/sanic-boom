@@ -2,7 +2,6 @@ import inspect
 import typing as t
 
 import pytest
-
 from sanic.request import Request
 
 from sanic_boom import Component, Resolver

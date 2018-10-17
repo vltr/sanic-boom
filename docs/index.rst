@@ -3,7 +3,7 @@
 ----------
 
 .. toctree::
-    :caption: middle-schema
+    :caption: sanic-boom
     :maxdepth: 1
 
     installing

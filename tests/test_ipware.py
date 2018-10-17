@@ -11,7 +11,6 @@ def test_headers(app):
         return text(request.remote_addr)
 
     # test 1
-
     headers = {
         "X-Forwarded-For": "177.139.233.139, 198.84.193.157, 198.84.193.158"
     }
@@ -20,7 +19,6 @@ def test_headers(app):
     assert response.text == "177.139.233.139"
 
     # test 2
-
     headers = {
         "X-Forwarded-For": "177.139.233.139, 198.84.193.157, 198.84.193.158",
         "Forwarded-For": "177.139.233.133",
@@ -30,7 +28,6 @@ def test_headers(app):
     assert response.text == "177.139.233.139"
 
     # test 3
-
     app.config.IPWARE_PROXY_TRUSTED_IPS = ["198.84.193.158"]
     headers = {
         "X-Forwarded-For": "177.139.233.139, 198.84.193.157, 198.84.193.158"
@@ -40,7 +37,6 @@ def test_headers(app):
     assert response.text == "177.139.233.139"
 
     # test 4
-
     app.config.IPWARE_PROXY_COUNT = 2
     headers = {
         "X-Forwarded-For": "177.139.233.139, 198.84.193.157, 198.84.193.158"
@@ -51,4 +47,4 @@ def test_headers(app):
 
 
 def test_no_running_app(sanic_request):
-    assert sanic_request.remote_addr == ""
+    assert sanic_request.remote_addr is None

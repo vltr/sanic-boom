@@ -1,7 +1,7 @@
 import pytest
-from sanic.request import Request
 
 from sanic_boom import (
+    BoomRequest,
     CacheEngine,
     Component,
     Resolver,
@@ -26,7 +26,7 @@ class SomeApp:
 
 @pytest.fixture
 def sanic_request():
-    return Request(
+    return BoomRequest(
         url_bytes=b"/foo/bar",
         headers={},
         version=None,

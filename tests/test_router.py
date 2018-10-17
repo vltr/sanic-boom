@@ -293,6 +293,17 @@ def test_variable_name_substitution(app):
         == "/get/details/20/my/favicon.ico"
     )
 
+    assert (
+        app.url_for(
+            "handler",
+            command="details",
+            id=20,
+            src="my/favicon.ico",
+            extra="something",
+        )
+        == "/get/details/20/my/favicon.ico?extra=something"
+    )
+
     with pytest.raises(URLBuildError):
         app.url_for("handler", command="details", src="my/favicon.ico")
 
@@ -353,3 +364,34 @@ def test_basic_component_handling(app):
 
     request, response = app.test_client.get("/test/error/42")
     assert response.status == 200
+
+
+def test_url_for_various_arguments(app):
+    app.config.SERVER_NAME = "localhost"
+
+    @app.get("/")
+    async def handler(request):  # noqa
+        pass
+
+    assert (
+        app.url_for("handler", _scheme="http", _external=True)
+        == "http://localhost/"
+    )
+    assert (
+        app.url_for(
+            "handler", _scheme="http", _server="example.tld", _external=True
+        )
+        == "http://example.tld/"
+    )
+    assert (
+        app.url_for("handler", _server="example.tld", _external=True)
+        == "http://example.tld/"
+    )
+    assert (
+        app.url_for("handler", _server="https://example.tld", _external=True)
+        == "https://example.tld/"
+    )
+    assert app.url_for("handler", _server="example.tld") == "//example.tld/"
+
+    with pytest.raises(ValueError):
+        app.url_for("handler", _scheme="https")

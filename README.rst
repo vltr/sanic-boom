@@ -1,6 +1,6 @@
-=================
-``middle-schema``
-=================
+==============
+``sanic-boom``
+==============
 
 .. start-badges
 
@@ -42,23 +42,15 @@
 
 .. end-badges
 
-Components injection, fast routing and non-global middlewares. Give your Sanic application a Boom!
+Components injection, fast routing and non-global (layered) middlewares. Give your Sanic application a Boom!
 
 In a nutshell
 -------------
 
-.. code-block:: pycon
-
-    >>> import sanic_boom
-
-    >>> print("hello")
-    hello
-
-    >>> @enum.unique
-    ... class CityRegionEnum(str, enum.Enum):
-    ...     TROPICAL = "TROPICAL"
-    ...     TEMPERATE = "TEMPERATE"
-    ...     BOREAL = "BOREAL"
+.. literalinclude:: examples/marshmallow-integration.py
+   :language: python
+   :emphasize-lines: 48-81
+   :linenos:
 
 .. warning::
 

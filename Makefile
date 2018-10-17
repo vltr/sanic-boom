@@ -17,7 +17,7 @@ help:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 black:
-	black ./src/sanic_boom/ ./tests setup.py
+	black ./examples/ ./src/sanic_boom/ ./tests setup.py
 
 cleanpycache:
 	find . -type d | grep "__pycache__" | xargs rm -rf
