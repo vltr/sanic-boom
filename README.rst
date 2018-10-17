@@ -154,6 +154,18 @@ In a nutshell
 
     **IMPORTANT**: ``sanic-boom`` is in **very early stages** of development! Use with caution and be aware that some functionalities and APIs may change between versions until they're out of **alpha**.
 
+Dependencies
+============
+
+``sanic-boom`` depends on two "not-so-known" libraries (both created by the author of ``sanic-boom``):
+
+- `sanic-ipware <https://github.com/vltr/sanic-ipware>`_; and
+- `xrtr <https://xrtr.readthedocs.io/en/latest/>`_
+
+.. important::
+
+    Since ``xrtr`` **replaces** the Sanic default router under the hood in ``sanic-boom``, it is very important for the developer to read its documentation (in the link provided above).
+
 Documentation
 =============
 
