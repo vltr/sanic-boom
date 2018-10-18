@@ -24,7 +24,6 @@ exclude .travis.yml
 exclude .venv
 exclude .vscode
 exclude appveyor.yml
-exclude docs/examples
 exclude examples
 exclude Makefile
 exclude requirements-dev.*
@@ -34,6 +33,5 @@ exclude tox.ini
 recursive-exclude .github *
 recursive-exclude .vscode *
 recursive-exclude examples *
-recursive-exclude docs/examples *
 
 global-exclude *.py[cod] __pycache__ *.so *.dylib

@@ -8,6 +8,23 @@
 
     installing
     using
+    innerworks
+    middlewares
+    components
+    lifecycle
+    resolver
+    cache
+    router
+    paramparser
+
+.. toctree::
+    :caption: Examples
+    :maxdepth: 1
+
+    headers
+    marshmallowex
+    sanicjwtex
+    sqlalchemyex
 
 .. toctree::
     :caption: About the Project
@@ -17,3 +34,4 @@
     contributing
     changelog
     authors
+    thanks

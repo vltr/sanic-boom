@@ -2,6 +2,7 @@ import inspect
 import typing as t
 from functools import lru_cache
 
+from sanic.log import logger
 from sanic.request import Request
 
 from sanic_boom.component import Component
@@ -42,9 +43,9 @@ class Resolver:
         ):
             raise TypeError('The provided parameter "func" is not a function')
         kwargs = {}
-        params = inspect.signature(func).parameters.values()
+        params = inspect.signature(func).parameters
 
-        for param in params:
+        for param in params.values():
 
             if prefetched is not None and param.name in prefetched:
                 kwargs.update(
@@ -67,6 +68,25 @@ class Resolver:
                 param.annotation, inspect.Parameter
             ) or param.name in ("param", "parameter"):
                 kwargs.update({param.name: source_param or param})
+                continue
+
+            if param.kind == param.VAR_POSITIONAL:  # equals *args, *a
+                # this is only valid for HTTPMethodView
+                if hasattr(func, "view_class"):
+                    # most likely request is the only thing missing here
+                    kwargs.update({"request": request})
+                else:
+                    logger.debug(
+                        "Parameter '{}' skipped from resolver".format(
+                            param.name
+                        )
+                    )
+                continue
+
+            elif param.kind == param.VAR_KEYWORD:  # equals **kw, **kwargs
+                logger.debug(
+                    "Parameter '{}' skipped from resolver".format(param.name)
+                )
                 continue
 
             component = self.find_component(param=param)

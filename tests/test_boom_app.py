@@ -38,6 +38,28 @@ def test_initialization():
         app.remove_route("/foo")
 
 
+def test_no_arg_handler(app):
+    @app.get("/")
+    async def handler():
+        return text("OK")
+
+    request, response = app.test_client.get("/")
+    assert response.status == 200
+    assert response.text == "OK"
+
+
+def test_args_kwargs_handler(app):
+    @app.get("/")
+    async def handler(*args, **kwargs):
+        assert args == tuple()
+        assert kwargs == {}
+        return text("OK")
+
+    request, response = app.test_client.get("/")
+    assert response.status == 200
+    assert response.text == "OK"
+
+
 def test_prepend_slash(app):
     @app.middleware(uri="foo")
     async def my_middleware(request):
