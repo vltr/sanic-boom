@@ -48,7 +48,47 @@ def test_no_arg_handler(app):
     assert response.text == "OK"
 
 
+def test_no_arg_middlewares(app):
+    @app.middleware
+    async def request_middleware():  # noqa
+        pass
+
+    @app.middleware(attach_to="response")
+    async def response_middleware():  # noqa
+        pass
+
+    @app.get("/")
+    async def handler():
+        return text("OK")
+
+    request, response = app.test_client.get("/")
+    assert response.status == 200
+    assert response.text == "OK"
+
+
 def test_args_kwargs_handler(app):
+    @app.get("/")
+    async def handler(*args, **kwargs):
+        assert args == tuple()
+        assert kwargs == {}
+        return text("OK")
+
+    request, response = app.test_client.get("/")
+    assert response.status == 200
+    assert response.text == "OK"
+
+
+def test_args_kwargs_middlewares(app):
+    @app.middleware
+    async def request_middleware(*args, **kwargs):
+        assert args == tuple()
+        assert kwargs == {}
+
+    @app.middleware(attach_to="response")
+    async def response_middleware(*args, **kwargs):
+        assert args == tuple()
+        assert kwargs == {}
+
     @app.get("/")
     async def handler(*args, **kwargs):
         assert args == tuple()
