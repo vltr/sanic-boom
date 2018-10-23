@@ -15,7 +15,7 @@ def read(*names, **kwargs):
 
 setup(
     name="sanic-boom",
-    version="0.1.1",
+    version="0.1.2",
     license="MIT license",
     description="Components injection, fast routing and non-global (layered) "
     "middlewares. Give your Sanic application a Boom!",
