@@ -1,6 +1,11 @@
 Changelog
 =========
 
+v0.1.2 on 2018-10-23
+--------------------
+
+* Added ``components`` property on ``BoomRequest`` so any request "leftover" may be handled property (like an open database connection).
+
 v0.1.1 on 2018-10-18
 --------------------
 

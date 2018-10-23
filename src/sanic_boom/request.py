@@ -1,6 +1,8 @@
 from sanic.request import Request
 from sanic_ipware import get_client_ip
 
+from sanic_boom.utils import REQUEST_CACHE_KEY
+
 
 class BoomRequest(Request):
     @property
@@ -27,3 +29,9 @@ class BoomRequest(Request):
             )
             self._remote_addr = ip
         return self._remote_addr
+
+    @property
+    def components(self):
+        if REQUEST_CACHE_KEY in self:
+            return self[REQUEST_CACHE_KEY]
+        return None

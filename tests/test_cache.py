@@ -6,8 +6,10 @@ from threading import Thread
 
 import pytest
 from sanic.request import Request
+from sanic.response import text
 
 from sanic_boom import Component, ComponentCache
+from sanic_boom.utils import REQUEST_CACHE_KEY
 
 
 class NonCached:
@@ -102,17 +104,17 @@ async def test_request_cached_component(some_app, sanic_request):
     ret = await hello(**kw)
 
     assert type(ret) is str
-    assert type(sanic_request["_sanic_boom_cache"]) is dict
-    assert len(sanic_request["_sanic_boom_cache"]) == 1
-    assert ret in sanic_request["_sanic_boom_cache"].values()
+    assert type(sanic_request[REQUEST_CACHE_KEY]) is dict
+    assert len(sanic_request[REQUEST_CACHE_KEY]) == 1
+    assert ret in sanic_request[REQUEST_CACHE_KEY].values()
 
     # same request, result should be cached for "my_var"
     kw2 = await some_app.resolver.resolve(request=sanic_request, func=hello)
     ret2 = await hello(**kw2)
 
     assert type(ret2) is str
-    assert len(sanic_request["_sanic_boom_cache"]) == 1
-    assert ret2 in sanic_request["_sanic_boom_cache"].values()
+    assert len(sanic_request[REQUEST_CACHE_KEY]) == 1
+    assert ret2 in sanic_request[REQUEST_CACHE_KEY].values()
     # both my_vars should be equal
     assert ret == ret2
 
@@ -129,9 +131,9 @@ async def test_request_cached_component(some_app, sanic_request):
     ret3 = await hello(**kw3)
 
     assert type(ret3) is str
-    assert type(new_request["_sanic_boom_cache"]) is dict
-    assert len(new_request["_sanic_boom_cache"]) == 1
-    assert ret3 in new_request["_sanic_boom_cache"].values()
+    assert type(new_request[REQUEST_CACHE_KEY]) is dict
+    assert len(new_request[REQUEST_CACHE_KEY]) == 1
+    assert ret3 in new_request[REQUEST_CACHE_KEY].values()
     assert ret != ret3
 
     kw4 = await some_app.resolver.resolve(request=sanic_request, func=world)
@@ -295,3 +297,30 @@ async def test_app_cached_component(some_app, sanic_request):
         assert type(ret2) is str
 
     assert ret != ret2
+
+
+def test_boom_request_components(app):
+    app.add_component(RequestCachedComponent)
+
+    @app.get("/")
+    async def my_handler(var1: RequestCached, var2: RequestCached):
+        return text("OK")
+
+    @app.get("/test")
+    async def test_handler():
+        return text("test")
+
+    request, response = app.test_client.get("/")
+
+    assert response.status == 200
+    assert response.text == "OK"
+
+    assert type(request.components) is dict
+    assert len(request.components) == 2
+
+    request, response = app.test_client.get("/test")
+
+    assert response.status == 200
+    assert response.text == "test"
+
+    assert request.components is None

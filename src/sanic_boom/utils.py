@@ -1,4 +1,7 @@
 import inspect
+import uuid
+
+REQUEST_CACHE_KEY = "_sanic_boom_cache_{!s}".format(uuid.uuid4())
 
 
 def param_parser(value: str, param: inspect.Parameter):

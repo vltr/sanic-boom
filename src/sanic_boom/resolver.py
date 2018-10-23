@@ -7,6 +7,7 @@ from sanic.request import Request
 
 from sanic_boom.component import Component
 from sanic_boom.exceptions import InvalidComponent, NoApplicationFound
+from sanic_boom.request import BoomRequest
 
 
 class Resolver:
@@ -33,7 +34,7 @@ class Resolver:
     async def resolve(
         self,
         *,
-        request: Request,
+        request: t.Union[Request, BoomRequest],
         func: t.Callable,
         prefetched: t.Dict[str, t.Any] = None,
         source_param: inspect.Parameter = None
@@ -57,10 +58,10 @@ class Resolver:
                 )
                 continue
 
-            if isinstance(param.annotation, Request) or param.name in (
-                "request",
-                "req",
-            ):
+            if (
+                inspect.isclass(param.annotation)
+                and issubclass(param.annotation, Request)
+            ) or param.name in ("request", "req"):
                 kwargs.update({param.name: request})
                 continue
 
