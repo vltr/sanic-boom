@@ -51,7 +51,7 @@ setup(
     ],
     keywords=["sanic", "components", "lifecycle", "productivity"],
     install_requires=[
-        "Sanic>=0.8.0",
+        "Sanic<=19.3",
         "xrtr>=0.2.1",
         "sanic-ipware>=0.1.0",
         "httptools>=0.0.11",

@@ -99,7 +99,7 @@ class Resolver:
                 )
             else:
                 value = await self.app.cache_engine.get(
-                    component, func, request, source_param or param
+                    component, func, request, param or source_param
                 )
                 kwargs.update({param.name: value})
 
