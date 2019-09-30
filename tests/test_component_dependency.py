@@ -1,13 +1,12 @@
 import inspect
 import json
+import sys
 import typing as t
 import uuid
-import sys
 
 from sanic.response import text
 
 from sanic_boom import Component, ComponentCache
-
 
 try:  # noqa
     from ujson import loads as json_loads
@@ -70,9 +69,8 @@ class ParserComponent(Component):
     async def get(self, request, param: inspect.Parameter, body, track_id):
         inferred_cls = param.annotation.__args__[0]
 
-        if (
-            inspect.isclass(inferred_cls)
-            and issubclass(inferred_cls, BaseParser)
+        if inspect.isclass(inferred_cls) and issubclass(
+            inferred_cls, BaseParser
         ):  # noqa
             return inferred_cls(body=body, track_id=track_id)
         else:  # noqa
